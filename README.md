@@ -27,7 +27,7 @@ drop-down menu. The studies are selected with the mouse:
 -Optical torque
 -Near field
 
-The two branches of the code. One with FFTE (fast Fourier transform
+There is two branches for the code. One with FFTE (fast Fourier transform
 in the east) and one in parallel (openmp) with FFTW (fast Fourier
 transform in the west). For the version with openmp you should know
 how to play with ulimit and fix the number of processor...
