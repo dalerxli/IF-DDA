@@ -1,6 +1,6 @@
 # IF-DDA
 
-IF-DDA is a numerical techniques for solving the electromagnetic
+IF-DDA is a numerical tool for solving the electromagnetic
 scattering problem in three dimensions. IF-DDA is based on the DDA
 (discrete dipole approximation) which is a volume-integral equation
 method.  The DDA (also referred to as the coupled dipole method) was
@@ -20,11 +20,17 @@ IF-DDA has a friendly guide user interface where many particles
 (cuboid, sphere, ellipsoid, many spheres,...), beams (plane wave,
 Gaussian wave, multiple plane waves,...) are accessibles with a
 drop-down menu. The studies are selected with the mouse: 
+
 -Cross section 
+
 -Poynting vector 
+
 -Microscopy 
+
 -Optical force 
+
 -Optical torque
+
 -Near field
 
 There is two branches for the code. One with FFTE (fast Fourier transform
