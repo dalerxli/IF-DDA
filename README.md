@@ -1,6 +1,6 @@
 # IF-DDA
 
-IF-DDA is numerical techniques for solving the electromagnetic
+IF-DDA is a numerical techniques for solving the electromagnetic
 scattering problem in three dimensions. IF-DDA is based on the DDA
 (discrete dipole approximation) which is a volume-integral equation
 method.  The DDA (also referred to as the coupled dipole method) was
