@@ -2,8 +2,8 @@
      $     ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $     ,Tabdip,ntotalm,ntotal,ldabi,nlar,nmax,ndipole,nxm ,nym,nzm
      $     ,nx,ny ,nz ,nx2,ny2,nxy2,nz2,nbsphere,nbsphere3,XI,XR,wrk,FF
-     $     ,FF0 ,FFloc ,polarisa ,methodeit,tol,tol1,nloop,ncompte
-     $     ,planf,planb,nstop,infostr)
+     $     ,FF0 ,FFloc ,polarisa ,methodeit,tol,tol1,nloop,ncompte,nstop
+     $     ,infostr)
 
       
       implicit none
@@ -26,15 +26,10 @@
       double complex, dimension(nxm*nym*nzm,3,3) :: polarisa
       character(12) methodeit
       character(64) infostr
-      integer*8 planf,planb
-      integer FFTW_FORWARD,FFTW_ESTIMATE,FFTW_BACKWARD
- 
+
       nlim=10000 
       nou=0
       ndim=nbsphere3
-
- 
-      write(*,*) 'inverse rig non opt'
       
 !$OMP PARALLEL DEFAULT(SHARED) 
 !$OMP DO SCHEDULE(STATIC)  
@@ -45,7 +40,6 @@
 !$OMP END PARALLEL          
 
       if (methodeit(1:7).eq.'GPBICG1') then
-         write(*,*) 'coucou'
  2002    call GPBICG(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim,TOL
      $        ,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR)      
          if (nstat.lt.0) then
@@ -88,7 +82,7 @@
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
             return
@@ -154,7 +148,7 @@ c     write(*,*) 'GPBICG1 tol1',tol1,tmp/NORM
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
@@ -219,7 +213,7 @@ c     write(*,*) 'GPBICG2 tol1',tol1,tmp/NORM
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
@@ -283,7 +277,7 @@ c     write(*,*) 'GPBICGsafe tol1',tol1,tmp/NORM
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
          
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
@@ -348,7 +342,7 @@ c     write(*,*) 'GPBICGAR1 tol1',tol1,tmp/NORM
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
          
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
@@ -413,7 +407,7 @@ c     write(*,*) 'GPBICGAR2 tol1',tol1,tmp/NORM
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
             return
@@ -489,10 +483,11 @@ c     write(*,*) 'ncompte',ncompte,nt,tole
             enddo   
 !$OMP ENDDO 
 !$OMP END PARALLEL  
-            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
-     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
-     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $           ,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy
+     $           ,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz
+     $           ,vectx,vecty,vectz,Tabdip,ntotalm,ntotal,nmax
+     $           ,ndipole,nxm ,nym,nzm,nx,ny,nz,nx2,ny2,nxy2,nz2,XI
+     $           ,XR)
 
          elseif (nt.eq.2) then
 c     calcul avec le transpose
@@ -503,10 +498,11 @@ c     calcul avec le transpose
             enddo
 !$OMP ENDDO 
 !$OMP END PARALLEL               
-            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
-     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
-     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $           ,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy
+     $           ,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz
+     $           ,vectx,vecty,vectz,Tabdip,ntotalm,ntotal,nmax
+     $           ,ndipole,nxm ,nym,nzm,nx,ny,nz,nx2,ny2,nxy2,nz2,XI
+     $           ,XR)
             
 c     xr=-At*xi car A=At
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,k,ii,jj)  
@@ -592,7 +588,7 @@ c     write(*,*) 'QMR tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI ,XR)
 
 
          if (nstat.ne.1) goto  2004
@@ -665,7 +661,7 @@ c     write(*,*) 'TFQMR tol1',tol1,NORM,xr(1),FF(1),FF0(1)
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI ,XR)
 
          if (nstat.ne.1) goto  2005
 c     compute the Residue
@@ -733,7 +729,7 @@ c     write(*,*) 'ZCG tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
-     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
 
          if (nstat.ne.1) goto  2006
 
@@ -798,7 +794,7 @@ c     write(*,*) 'PIMZBICGSTAB tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
-     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
          if (nstat.ne.1) goto  2007
 c     compute the Residue
          tol1=0.d0
@@ -866,7 +862,7 @@ c     write(*,*) 'QMRBICGSTAB1 tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
-     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR,planb,planf)
+     $        ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
 
          if (nstat.ne.1) goto  2008
 c     compute the Residue
@@ -926,7 +922,7 @@ c     write(*,*) 'QMRBICGSTAB2 tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
@@ -992,7 +988,7 @@ c     write(*,*) 'GPBICOR tol1',tol1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planb,planf)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
          if (nstop == -1) then
             infostr = 'Calculation cancelled during iterative method'
             return

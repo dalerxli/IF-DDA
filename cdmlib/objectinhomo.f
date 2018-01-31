@@ -10,28 +10,11 @@
       double complex eps,polarisa(nmax,3,3) ,epsilon(nmax,3 ,3),ctmp
      $     ,epsb(nmax),icomp
 
-      integer nk,ngraine,ng,iret,omp_get_max_threads
+      integer nk,ngraine,ng
       double precision rayon,kx,ky,kz,dkx,dky,dkz,coeff1,coeff2,coeff3
      $     ,phase,spec,moyenne,ecartype,lx,ly,lz,sunif
       character*2 methode
       character(64) infostr
-      integer*8 planb
-      integer FFTW_FORWARD,FFTW_ESTIMATE,FFTW_BACKWARD
-
-
-      call dfftw_init_threads(iret)
-      if (iret.eq.0) then
-         write(*,*) 'iret',iret
-         infostr='Unlikely error during thread initialization'
-         nstop=1
-         return
-      endif
-      CALL dfftw_plan_with_nthreads(omp_get_max_threads())
-      FFTW_FORWARD=-1
-      FFTW_BACKWARD=+1
-      FFTW_ESTIMATE=64
-      call dfftw_plan_dft_3d(planb, nx,ny,nz,epsb,epsb,FFTW_BACKWARD
-     $     ,FFTW_ESTIMATE)
 
 c     Initialization
       nbsphere=0
@@ -128,8 +111,7 @@ c     Spectre symetrique pour diffraction harmonique
       enddo     
       
 c     Profil des hauteurs
-      call dfftw_execute_dft(planb, epsb, epsb)   
-      
+      call ZFFT3D(epsb,NX,NY,NZ,1)
       moyenne=0.d0
       ecartype=0.d0
       do i=1,nk

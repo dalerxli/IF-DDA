@@ -191,20 +191,9 @@ c     variables pour le temps
       character(10) :: time
       character(5)  :: zone
       integer,dimension(8) :: values,values2,valuesi,valuesf
-      integer iret,omp_get_max_threads
-      integer*8 planf,planb,plan2f,plan2b,planfn,planbn
-      integer FFTW_FORWARD,FFTW_ESTIMATE,FFTW_BACKWARD
 
       call date_and_time(date,time,zone,valuesi)
-      
-      call dfftw_init_threads(iret)
-      if (iret.eq.0) then
-         write(*,*) 'iret',iret
-         infostr='Unlikely error during thread initialization'
-         nstop=1
-         return
-      endif
-      CALL dfftw_plan_with_nthreads(omp_get_max_threads())
+
       
 c     FF0 : champ incident
 c     FF  : dipole
@@ -319,10 +308,6 @@ c     liste des arrets pour section efficace
             return
          endif
       endif
-
-
-
-
       
 c     calculation size parameter initialization
       nmax = nxm*nym*nzm
@@ -575,7 +560,6 @@ c     Built the object
             return
          endif
          
-         write(*,*) 'prout',sidex,sidey,sidez,xg,yg ,zg,lc,hc,ng
          call objetparainhomo(eps,eps0,xs,ys,zs,k0 ,aretecube ,tabdip
      $        ,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,nxm,nym,nzm
      $        ,polarizability ,epsilon ,polarisa,sidex,sidey,sidez,xg,yg
@@ -826,22 +810,6 @@ c     circulant matrix with a doble size.
       nz2=2*nz
       nxy2=nx2*ny2
       ntotal=8*nx*ny*nz      
-
-c     calcul les plans pour la FFT3D
-      FFTW_FORWARD=-1
-      FFTW_BACKWARD=+1
-      FFTW_ESTIMATE=64
-      call dfftw_plan_dft_3d(planb, nx2,ny2,nz2, vectx,vectx
-     $     ,FFTW_BACKWARD,FFTW_ESTIMATE)
-      write(*,*) 'planb',planb
-      call dfftw_plan_dft_3d(planf, nx2,ny2,nz2, vectx,vectx
-     $     ,FFTW_FORWARD,FFTW_ESTIMATE)
-
-c     calcul les plans pour la FFT2D
-      call dfftw_plan_dft_2d(plan2b, nfft2d,nfft2d, vectx,vectx
-     $     ,FFTW_BACKWARD,FFTW_ESTIMATE)
-      call dfftw_plan_dft_2d(plan2f, nfft2d,nfft2d, vectx,vectx
-     $     ,FFTW_FORWARD,FFTW_ESTIMATE)
       
 c     if the computation asked is rigourous then compute the Green
 c     function
@@ -851,16 +819,14 @@ c     function
          write(*,*)
      $        '**** Begin computation of the Green function ****'
 c     Compute the Green fonction in free space
-         write(*,*) 'nquqd',nquad
          if (nquad.eq.0) then
             call greencalculfft(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
      $           ,aretecube,k0,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
-     $           ,FFTTENSORyy ,FFTTENSORyz,FFTTENSORzz,planb)
+     $           ,FFTTENSORyy ,FFTTENSORyz,FFTTENSORzz)
          else
             call greencalculquadfft(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym
      $           ,nzm,nquad,tolinit,aretecube,k0,FFTTENSORxx,FFTTENSORxy
-     $           ,FFTTENSORxz ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz
-     $           ,planb) 
+     $           ,FFTTENSORxz ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz) 
          endif
 
          write(*,*) 'End FFT computation of the Green function'
@@ -981,20 +947,14 @@ c     compute the intenisty at the first object location
          tol=tolinit
          call gaussianpuissance(P0,irra,w0,k0,E0)
          I0=cdabs(E0)**2
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)
-!$OMP DO SCHEDULE(STATIC)    
          do i=1,nbsphere
             call gaussianchamp(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus,theta
      $           ,phi,w0,k0,ss,pp,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i),tol
      $           ,nloin,nstop,infostr)
             
+c     write(*,*) 'champ',i,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+c     write(*,*) 'champderivee',i,icomp*k0*FF0(3*i-2)
          enddo
-!$OMP ENDDO 
-!$OMP END PARALLEL          
-c         do i=1,nbsphere
-c            write(*,*) 'champ',i,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
-c         enddo
-c         stop
       elseif (beam(1:13).eq.'gwavecircular') then
          write(99,*) 'theta=',theta
          write(99,*) 'phi=',phi
@@ -1008,15 +968,15 @@ c         stop
          tol=tolinit
          call gaussianpuissance(P0,irra,w0,k0,E0)
          I0=cdabs(E0)**2
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)
-!$OMP DO SCHEDULE(STATIC)           
          do i=1,nbsphere
+            subunit= subunit+1            
             call gaussianchampcirc(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
      $           ,theta,phi,w0,k0,ss,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
      $           ,tol,nloin,nstop,infostr)
+c     write(*,*) 'totocirc',xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
+c     $           ,theta,phi,w0,k0,ss,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+c     $           ,tol,nloin
          enddo
-!$OMP ENDDO 
-!$OMP END PARALLEL     
       elseif (beam(1:8).eq.'gfftwave') then
          write(*,*) 'incident wave with FFT'
          write(99,*) 'theta=',theta
@@ -1032,8 +992,8 @@ c         stop
          I0=cdabs(E0)**2
          call gaussianchampfft(xs,ys,zs,aretecube,k0,w0,E0,ss,pp ,theta
      $        ,phi,xgaus,ygaus,zgaus,beam,ndipole,nx,ny,nz,nxm,nym,nzm
-     $        ,nmax,nfft2d,Eimagex,Eimagey,Eimagez,FF0,tolinit,plan2f
-     $        ,plan2b,nstop ,infostr)
+     $        ,nmax,nfft2d,Eimagex,Eimagey,Eimagez,FF0,tolinit,nstop
+     $        ,infostr)
          
       elseif (beam(1:15).eq.'gparawavelinear') then
          write(99,*) 'theta=',theta
@@ -1194,24 +1154,24 @@ c     initilization for solve Ax=b
          ncompte=0
          nloop=0
 
-         write(*,*) 'nproche',nproche
+         
          if (nproche.eq.-1) then
-            write(*,*) 'rrrrrrrr'
+
             call inverserig(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $           ,Tabdip,ntotalm,ntotal,ldabi,nlar,nmax,ndipole,nxm,nym
      $           ,nzm,nx,ny,nz,nx2,ny2,nxy2,nz2,nbsphere,nbsphere3,XI
      $           ,XR,wrk,FF,FF0,FFloc,polarisa,methodeit,tol,tol1,nloop
-     $           ,ncompte ,planf,planb,nstop,infostr)
+     $           ,ncompte,nstop,infostr)
 
          else
-            write(*,*) 'ddddd'
+
             call inverserigopt(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $           ,ntotalm,ntotal,ldabi,nlar,nmax,nxm,nym,nzm,nx,ny,nz
      $           ,nx2,ny2,nxy2,nz2,nbsphere,nbsphere3,XI,XR,wrk,FF,FF0
-     $           ,FFloc,polarisa,methodeit,tol,tol1,nloop,ncompte
-     $           ,planf,planb,nstop,infostr)
+     $           ,FFloc,polarisa,methodeit,tol,tol1,nloop,ncompte,nstop
+     $           ,infostr)
 
          endif
          if (nstop.eq.1) return
@@ -1344,7 +1304,7 @@ c     renormalized Born ordre 1
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planf,planb)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,k) 
 !$OMP DO SCHEDULE(STATIC)       
@@ -1392,7 +1352,7 @@ c     Rytov renormalize
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planf,planb)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,k,tmp)
 !$OMP DO SCHEDULE(STATIC)      
@@ -1477,7 +1437,7 @@ c     a3=aretecube*aretecube*aretecube
          call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
-     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR,planf,planb)
+     $        ,nz,nx2,ny2,nxy2,nz2,XI,XR)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,k,tmp)
 !$OMP DO SCHEDULE(STATIC)      
@@ -1535,7 +1495,7 @@ c     Beam propagation method
          call beampropagationmacro(xs,ys,zs,aretecube,k0,w0,E0,ss,pp
      $        ,theta,phi,xgaus,ygaus,zgaus,beam,epsilon,ndipole ,nx ,ny
      $        ,nz,nxm,nym ,nzm,nmax,nfft2d,Eimagex,Eimagey,Eimagez,FF0
-     $        ,FFloc,FF,plan2f,plan2b ,nstop,infostr)
+     $        ,FFloc,FF ,nstop,infostr)
 
          if (nstop.eq.1) return
 
@@ -1569,7 +1529,7 @@ c     Beam propagation method
          call beampropagation(xs,ys,zs,aretecube,k0,w0,E0,ss,pp,theta
      $        ,phi,xgaus,ygaus,zgaus,beam,epsilon,ndipole ,nx ,ny,nz,nxm
      $        ,nym ,nzm,nmax,nfft2d,Eimagex,Eimagey,Eimagez,FF0 ,FFloc
-     $        ,FF,plan2f,plan2b,nstop,infostr)
+     $        ,FF ,nstop,infostr)
 
          if (nstop.eq.1) return
 
@@ -1637,20 +1597,17 @@ c     compute the FFT in all the box
          nym2=2*nym
          nzm2=2*nzm
          nxym2=nxm2*nym2
-         call dfftw_plan_dft_3d(planbn, nx2,ny2,nz2, vectx,vectx
-     $        ,FFTW_BACKWARD,FFTW_ESTIMATE)
-         call dfftw_plan_dft_3d(planfn, nx2,ny2,nz2, vectx,vectx
-     $        ,FFTW_FORWARD,FFTW_ESTIMATE)
+
 
          if (nquad.eq.0) then
             call greencalculfft(nxm,nym,nzm,nxm2,nym2,nzm2,nxym2,nxm,nym
      $           ,nzm,aretecube,k0,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
-     $           ,FFTTENSORyy ,FFTTENSORyz,FFTTENSORzz,planbn)
+     $           ,FFTTENSORyy ,FFTTENSORyz,FFTTENSORzz)
          else
             call greencalculquadfft(nxm,nym,nzm,nxm2,nym2,nzm2,nxym2,nxm
      $           ,nym,nzm,nquad,tolinit,aretecube,k0,FFTTENSORxx
      $           ,FFTTENSORxy,FFTTENSORxz ,FFTTENSORyy,FFTTENSORyz
-     $           ,FFTTENSORzz,planbn) 
+     $           ,FFTTENSORzz) 
          endif
 
             
@@ -1735,7 +1692,7 @@ c     initialize and reuse polarisa : pola= background
             call  gaussianchampfft(xswf,yswf,zswf,aretecube,k0,w0,E0,ss
      $           ,pp,theta,phi,xgaus,ygaus,zgaus,beam,ndipole,nxm,nym
      $           ,nzm,nxm,nym ,nzm,nmax,nfft2d,Eimagex,Eimagey,Eimagez
-     $           ,xr,tolinit,plan2f,plan2b,nstop,infostr)
+     $           ,xr,tolinit,nstop,infostr)
 
             subunit=0
             cntwf=0
@@ -1908,7 +1865,7 @@ c     FFT:
          call produitfftmatvectopt(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
      $        ,ntotalm,ntotalm,nmax,nxm,nym,nzm,nxm,nym,nzm,nxm2,nym2
-     $        ,nxym2,nzm2,xi,xr,planfn,planbn)
+     $        ,nxym2,nzm2,xi,xr)
          write(*,*) 'nlocal',nlocal,subunit,xr(1),xr(2),xr(3)
          if (nlocal.eq.1) then
             if (nmat.eq.0) then
@@ -2293,8 +2250,7 @@ c     compute the diffracted field with FFT
             write(*,*) 'Diffracted field: Quick method with FFT'
             call diffractefft2d(nx,ny,nz,nxm,nym,nzm,nfft2d,k0,xs,ys,zs
      $           ,aretecube,Efourierx,Efouriery,Efourierz,FF,imaxk0
-     $           ,deltakx,deltaky,Ediffkzpos,Ediffkzneg,plan2f,plan2b
-     $           ,nstop,infostr)
+     $           ,deltakx,deltaky,Ediffkzpos,Ediffkzneg,nstop,infostr)
             write(*,*) 'End Quick method with FFT'
             if (nstop.eq.1) return
 c     put the field in file with the right angles
@@ -2468,8 +2424,8 @@ c     save the Poynting vecteur
      $        ,xdip,ydip,zdip,xgaus,ygaus,zgaus ,w0,aretecube,tol
      $        ,Efourierx,Efouriery,Efourierz,FF,imaxk0 ,deltakx,deltaky
      $        ,Ediffkzpos,Ediffkzneg,beam,efficacite ,efficaciteref
-     $        ,efficacitetrans,nsectionsca,nquickdiffracte,plan2f,plan2b
-     $        ,nstop ,infostr)
+     $        ,efficacitetrans,nsectionsca,nquickdiffracte,nstop
+     $        ,infostr)
 ccc         write(*,*) 'ttt',Efouriery
          if (nstop.eq.1) return
          write(*,*) 'Absorptivity   : ',efficacite
@@ -2523,8 +2479,8 @@ c     appelle routine pour calculer le champ incident.
             call  diffractefft2dinc(nfft2d,k0,E0,ss,pp,theta,phi,thetam
      $           ,phim, ppm, ssm,E0m,nbinc,xdip,ydip,zdip,xgaus,ygaus
      $           ,zgaus,w0,aretecube,tol,Efourierx,Efouriery,Efourierz
-     $           ,imaxk0,deltakx,deltaky,Ediffkzneg,numaper,beam,plan2f
-     $           ,plan2b,nstop ,infostr)
+     $           ,imaxk0,deltakx,deltaky,Ediffkzneg,numaper,beam,nstop
+     $           ,infostr)
             if (nstop.eq.1) return
             
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)   
@@ -2728,10 +2684,10 @@ c     rotation de theta plus theta'
             if (nsectionsca*nquickdiffracte.eq.0.and.nenergie.eq.0) then
                call diffractefft2dlens(nx,ny,nz,nxm,nym,nzm,nfft2d,k0,xs
      $              ,ys,zs,aretecube,Efourierx,Efouriery,Efourierz,FF
-     $              ,imaxk0,deltakx,deltaky,Ediffkzpos,numaper,plan2f
-     $              ,plan2b,nstop ,infostr)
+     $              ,imaxk0,deltakx,deltaky,Ediffkzpos,numaper,nstop
+     $              ,infostr)
                if (nstop.eq.1) return
-
+               
             elseif (nsectionsca*nquickdiffracte.eq.1.and.nenergie.eq.0)
      $              then
                k02=k0*k0
@@ -2795,8 +2751,7 @@ c     calcul le champ incident
      $              ,thetam,phim, ppm, ssm,E0m,nbinc,xdip,ydip,zdip
      $              ,xgaus,ygaus,zgaus,w0,aretecube,tol,Efourierx
      $              ,Efouriery,Efourierz,imaxk0,deltakx,deltaky
-     $              ,Ediffkzneg ,numaper,beam,plan2f,plan2b,nstop
-     $              ,infostr)
+     $              ,Ediffkzneg ,numaper,beam,nstop,infostr)
 c     stop
                if (nstop.eq.1) return
 
@@ -3006,8 +2961,7 @@ c     stop
          write(*,*) 'Compute the images through the microscope'
 
          call fouriertoimage(deltakx,deltaky,Eimagex,Eimagey,Eimagez
-     $        ,Eimageincx,Eimageincy,Eimageincz,nfft2D,nfft2d2,plan2b
-     $        ,plan2f)
+     $        ,Eimageincx,Eimageincy,Eimageincz,nfft2D,nfft2d2)
          
 c     calcul intensite de l'image
          if (nmat.eq.0) then
@@ -3103,15 +3057,15 @@ c               write(*,*) 'z',i,xi(ii+1),xi(ii+2),xi(ii+3)
 !$OMP ENDDO 
 !$OMP END PARALLEL            
          endif
-         write(*,*) 'rrrrf',nproche
+
          if (nproche.eq.-1) then
             call calculforcefft(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
-     $           ,tabdip,vectx,vecty,vectz,FF,planb)
+     $           ,tabdip,vectx,vecty,vectz,FF)
          else
             call calculforcefftopt(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
-     $           ,vectx,vecty,vectz,FF,planb)
+     $           ,vectx,vecty,vectz,FF)
          endif
-         write(*,*) 'rrrrf'
+         
          
 c     do i=1,nx2*ny2*nz2
 c     write(99,*) 'vect',vectx(i),vecty(i),vectz(i)
@@ -3122,8 +3076,8 @@ c     Compute the x derivative of the local field
          call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
      $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
-     $        ,test,FF0,planb,planf)
-         write(*,*) 'rrrrffff'
+     $        ,test,FF0)
+         
          do i=1,ndipole
             ii=3*i
             if (Tabdip(i).ne.0) then
@@ -3196,7 +3150,7 @@ c     Compute the x derivative of the local field
          call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
      $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
-     $        ,test,FF0,planb,planf)
+     $        ,test,FF0)
          do i=1,ndipole
             ii=3*i
             if (Tabdip(i).ne.0) then
@@ -3249,7 +3203,7 @@ c     Compute the z derivative of the local field
          call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
      $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
      $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
-     $        ,test,FF0,planb,planf)
+     $        ,test,FF0)
          do i=1,ndipole
             ii=3*i
             if (Tabdip(i).ne.0) then
@@ -3571,7 +3525,7 @@ c$$$  $     ,numaper ,gross
       write(*,*) 'Real time used by the code',(valuesf(5) -valuesi(5))
      $     *3600.d0+(valuesf(6)-valuesi(6))*60.d0+(valuesf(7)
      $     -valuesi(7)) +(valuesf(8)-valuesi(8))/1000.d0
-      
+        
       write(*,*) 'COMPLETED!'
       infostr='COMPLETED!'
       write(*,*) 'END'

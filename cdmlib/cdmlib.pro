@@ -22,7 +22,7 @@ DEFINES 	+= 	QT_NO_DEBUG_OUTPUT
 
 QMAKE_CC        =       gfortran -Warray-bounds -fcray-pointer
 
-QMAKE_CFLAGS    += -fopenmp -lfftw3_omp -lfftw3 -lm
+#QMAKE_CFLAGS    += -fopenmp -fmax-stack-var-size=32768 
 
 QMAKE_CFLAGS_RELEASE    = -O3 
 
@@ -91,6 +91,7 @@ SOURCES		+= 	cdmlib.f \
                         inverserigopt.f \
 			irradiance.f \
 			j4save.f \
+			kernel.f \
 			local-macro.f \
 			module_mie.f \
                         objectarbitrary.f \
@@ -113,6 +114,7 @@ SOURCES		+= 	cdmlib.f \
 			pimzbicgstab.f \
 			polaepstens.f \
 			polarisabilite.f \
+			produitfftmatvect2.f \
                         produitfftmatvect3.f \
                         produitfftmatvectopt.f \
 			qmrbicgstab.f \
@@ -126,6 +128,8 @@ SOURCES		+= 	cdmlib.f \
 			xersve.f \
 			xgetua.f \
 			zcg.f \
+                        zfft2dperso.f \
+			zfft3dperso1.f \
 			zgedid.f \
                         relecture.f \
                         comparaison.f \
@@ -141,6 +145,6 @@ SOURCES		+= 	cdmlib.f \
  
 INCLUDEPATH 	+= .
 
-LIBS 		+= 	-lgfortran -lfftw3_omp -lfftw3 -lm
+LIBS 		+= 	-lgfortran
 
 QMAKE_DISTCLEAN += lib/*

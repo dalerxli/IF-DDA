@@ -1,7 +1,7 @@
       subroutine gaussianchampdfft(xs,ys,zs,aretecube,k0,w0,E0,ss,pp
      $     ,theta,phi,xgaus,ygaus,zgaus,beam,ndipole,nx,ny,nz,nxm,nym
-     $     ,nzm ,nmax,nfft2d,imagex,imagey,imagez,FF0,tolinit,plan2f
-     $     ,plan2b,nstop ,infostr)
+     $     ,nzm ,nmax,nfft2d,imagex,imagey,imagez,FF0,tolinit,nstop
+     $     ,infostr)
       
       implicit none
 
@@ -21,7 +21,7 @@ c     input data
       double complex FF0(3 *nmax),icomp,Ex,Ey,Ez,fac
 c     output data
       character(64) beam
-      integer *8 plan2f ,plan2b
+      
       pi=dacos(-1.d0)
       icomp=(0.d0,1.d0)
       c=299792458.d0

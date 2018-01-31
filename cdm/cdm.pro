@@ -31,7 +31,7 @@ QMAKE_CXXFLAGS_RELEASE  -= -O2
 
 QMAKE_CXXFLAGS 	+= -O3 
 
-QMAKE_LFLAGS    += -fopenmp -lfftw3_omp -lfftw3 -lm
+#QMAKE_LFLAGS    += -fopenmp -fmax-stack-var-size=32768
 QMAKE_LFLAGS    += -O3
 
 HEADERS 	+= 	cdmMain.h \
@@ -88,7 +88,7 @@ unix:LIBS            += -Wl,-Bstatic \
                    -L$$QWT_LIB_PATH -lqwt \
                    -L$$QWTPLOT3_LIB_PATH -lqwtplot3d \
                    -Wl,-Bdynamic \
-                   -lGLU -lgfortran -lfftw3_omp -lfftw3 -lm
+                   -lGLU -lgfortran
 
 
 # make install

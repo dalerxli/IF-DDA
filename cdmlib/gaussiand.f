@@ -368,7 +368,7 @@ c     declaration
       external Idgaussianpropa,Idgaussianeva
 
       common/comgaussian/aa,zz,kk0,ww0
-!$OMP THREADPRIVATE(/comgaussian/)   
+     
 
       icomp=(0.d0,1.d0)
 
@@ -429,7 +429,7 @@ c*******************************************************************
       double precision y(3),alp,xx
 
       common/comgaussian/a,z,k0,w0
-!$OMP THREADPRIVATE(/comgaussian/)   
+
       kpara=dsqrt(k0-kz*kz)
       nn=3
       alp=0.d0
@@ -458,7 +458,7 @@ c*******************************************************************
       double precision y(3),alp,xx
 
       common/comgaussian/a,z,k0,w0
-!$OMP THREADPRIVATE(/comgaussian/)   
+
       kpara=dsqrt(k0+kz*kz)
       nn=3
       alp=0.d0

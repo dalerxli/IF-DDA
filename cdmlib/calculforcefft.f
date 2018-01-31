@@ -1,5 +1,5 @@
       subroutine calculforcefft(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
-     $     ,tabdip,vectx,vecty,vectz,FF,planb)
+     $     ,tabdip,vectx,vecty,vectz,FF)
       implicit none
       integer nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
       integer, dimension(nxm*nym*nzm) :: Tabdip
@@ -7,7 +7,7 @@
       double complex, dimension(3*nxm*nym*nzm) :: FF
       
       integer i,j,k,ii,jj,indice
-      integer*8 planb
+
 
       
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)
@@ -39,9 +39,17 @@
       enddo
 !$OMP ENDDO 
 !$OMP END PARALLEL
- 
-      call dfftw_execute_dft(planb, vectx, vectx)   
-      call dfftw_execute_dft(planb, vecty, vecty)     
-      call dfftw_execute_dft(planb, vectz, vectz)
       
+      
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION            
+      CALL ZFFT3D(vectx,NX2,NY2,NZ2,1)
+!$OMP SECTION              
+      CALL ZFFT3D(vecty,NX2,NY2,NZ2,1)
+!$OMP SECTION              
+      CALL ZFFT3D(vectz,NX2,NY2,NZ2,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
+
       end

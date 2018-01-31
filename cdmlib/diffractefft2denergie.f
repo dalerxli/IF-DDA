@@ -5,7 +5,7 @@ c     correction en -2i pi gamma.
      $     ,xdip ,ydip,zdip,xgaus,ygaus,zgaus ,w0,aretecube,tol,Eloinx
      $     ,Eloiny,Eloinz,FF,imax,deltakx ,deltaky,Ediffkzpos,Ediffkzneg
      $     ,beam,efficacite,efficaciteref ,efficacitetrans,nsectionsca
-     $     ,nquickdiffracte,plan2f,plan2b,nstop ,infostr)
+     $     ,nquickdiffracte,nstop ,infostr)
       implicit none
       integer nx,ny,nz,nxm,nym,nzm,nfft2d,nstop,nsectionsca
      $     ,nquickdiffracte
@@ -33,7 +33,7 @@ c     energie
       double precision fluxinc,fluxref,fluxtra,efficacite,efficaciteref
      $     ,efficacitetrans
       double precision tmp1,tmp2
-      integer*8 plan2f,plan2b
+
       
       pi=dacos(-1.d0)
       icomp=(0.d0,1.d0)
@@ -87,8 +87,7 @@ c     energie
 
 
       if (nsectionsca*nquickdiffracte.eq.0) then
-c         fac=dble(nfft2d*nfft2d)
-         fac=1.d0
+         fac=dble(nfft2d*nfft2d)
          
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j) 
 !$OMP DO SCHEDULE(STATIC) COLLAPSE(2)          
@@ -134,10 +133,17 @@ c         fac=dble(nfft2d*nfft2d)
 !$OMP ENDDO 
 !$OMP END PARALLEL     
 
-            call dfftw_execute_dft(plan2f,Eloinx,Eloinx)
-            call dfftw_execute_dft(plan2f,Eloiny,Eloiny)
-            call dfftw_execute_dft(plan2f,Eloinz,Eloinz)
-         
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION   
+            CALL ZFFT2D(Eloinx,nfft2d,nfft2d,2)
+!$OMP SECTION           
+            CALL ZFFT2D(Eloiny,nfft2d,nfft2d,2)
+!$OMP SECTION          
+            CALL ZFFT2D(Eloinz,nfft2d,nfft2d,2)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
+
             kk=1+nx*ny*(k-1)
 
 !$OMP PARALLEL DEFAULT(SHARED)
@@ -223,7 +229,7 @@ c     calcul pour rajouter le champ incident
       write(*,*) 'Size of the pixel',deltax
       z=0.d0
       nloin=0
-      fac=1.d0/deltakx/deltakx/dble(nfft2d*nfft2d)
+      fac=1.d0/deltakx/deltakx
 
 c     attention si beam gaussien alors passe par le calcul du paraxial
 c     pour accélerer le calcul
@@ -329,10 +335,20 @@ c     arret avant ne rentre jamais ici
       enddo
 
 c     calcul de la FFT
-      call dfftw_execute_dft(plan2f,Eloinx,Eloinx)
-      call dfftw_execute_dft(plan2f,Eloiny,Eloiny)
-      call dfftw_execute_dft(plan2f,Eloinz,Eloinz)
-         
+
+!$OMP PARALLEL  DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION        
+         CALL ZFFT2D(Eloinx,nfft2d,nfft2d,2)
+!$OMP SECTION           
+         CALL ZFFT2D(Eloiny,nfft2d,nfft2d,2)
+!$OMP SECTION
+         CALL ZFFT2D(Eloinz,nfft2d,nfft2d,2)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
+
+      
+
       fluxinc=0.d0
       fluxref=0.d0
       fluxtra=0.d0
@@ -440,8 +456,8 @@ c     $              ,2),Ediffkzpos(ii,jj,3)
 !$OMP ENDDO 
 !$OMP END PARALLEL
       write(*,*) tmp1,tmp2
-      write(*,*) 'Energy outside the NA (%)',dabs(tmp1-tmp2)/tmp2*100.d0
-      if (dabs(tmp1-tmp2)/tmp2*100.d0.ge.1.d0) then
+      write(*,*) 'Energy lost (%)',dabs(tmp1-tmp2)/tmp2*100.d0
+      if (dabs(tmp1-tmp2)/tmp2*100.d0.ge.1.d0) then 
       infostr='Emissivity: Beam too inclined or waist or nfft too small'
          nstop=1
       endif

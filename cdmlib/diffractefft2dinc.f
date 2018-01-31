@@ -1,7 +1,7 @@
       subroutine diffractefft2dinc(nfft2d,k0,E0,ss,pp,theta,phi, thetam,
      $     phim, ppm, ssm,E0m,nbinc,xdip,ydip,zdip,xgaus,ygaus,zgaus,w0
      $     ,aretecube,tol,Eloinx,Eloiny,Eloinz ,imax,deltakx ,deltaky
-     $     ,Ediffkzpos,numaper,beam,plan2f,plan2b,nstop,infostr)
+     $     ,Ediffkzpos,numaper,beam,nstop,infostr)
       implicit none
       integer nfft2d,nstop
       double precision k0,numaper,aretecube
@@ -24,7 +24,6 @@ c     variable pour champ incident
       double precision thetam(10), phim(10), ppm(10), ssm(10)
       double complex E0m(10)
       integer indicex,indicey
-      integer*8 plan2f,plan2b
       
       write(*,*) 'Compute the FFT of the incident field',nfft2d
       
@@ -39,7 +38,7 @@ c     variable pour champ incident
          return
       endif
       
-      fac=1.d0/deltakx/deltakx/dble(nfft2d*nfft2d)
+      fac=1.d0/deltakx/deltakx
       if (deltakx.ge.numaper) then
          nstop=1
          infostr='In FFT lens inc nfft2d too small'
@@ -154,10 +153,17 @@ c     ne rentre jamais ici
       enddo
 
 c     calcul de la FFT
-      call dfftw_execute_dft(plan2f,Eloinx,Eloinx)
-      call dfftw_execute_dft(plan2f,Eloiny,Eloiny)
-      call dfftw_execute_dft(plan2f,Eloinz,Eloinz)
-         
+
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION           
+      CALL ZFFT2D(Eloinx,nfft2d,nfft2d,2)
+!$OMP SECTION            
+      CALL ZFFT2D(Eloiny,nfft2d,nfft2d,2)
+!$OMP SECTION         
+      CALL ZFFT2D(Eloinz,nfft2d,nfft2d,2)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
       
 c     sauvegarde dans le tableau que pour les kz interessant et ajouts
 c     du -2 i pi gamma

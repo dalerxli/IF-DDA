@@ -1,6 +1,6 @@
       subroutine diffractefft2dlens(nx,ny,nz,nxm,nym,nzm,nfft2d,k0,xs,ys
      $     ,zs,aretecube,Eloinx,Eloiny,Eloinz,FF,imax,deltakx,deltaky
-     $     ,Ediffkzpos,numaper,plan2f,plan2b,nstop,infostr)
+     $     ,Ediffkzpos,numaper,nstop,infostr)
       implicit none
       integer nx,ny,nz,nxm,nym,nzm,nfft2d,nstop
       double precision xs(nxm*nym*nzm),ys(nxm*nym*nzm),zs(nxm*nym*nzm)
@@ -13,8 +13,7 @@
       double complex ctmp,ctmp1,icomp,Eloinx(nfft2d*nfft2d)
      $     ,Eloiny(nfft2d*nfft2d),Eloinz(nfft2d*nfft2d)
       character(64) infostr
-      integer*8 plan2f,plan2b
-      
+
       pi=dacos(-1.d0)
       icomp=(0.d0,1.d0)
       deltakx=2.d0*pi/(dble(nfft2d)*aretecube)
@@ -34,8 +33,7 @@
       nfft2d2=nfft2d/2  
       var1=(xs(1)+dble(nfft2d2)*aretecube)*deltakx
       var2=(ys(1)+dble(nfft2d2)*aretecube)*deltaky
-c     fac=dble(nfft2d*nfft2d)
-      fac=1.d0
+      fac=dble(nfft2d*nfft2d)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)
 !$OMP DO SCHEDULE(STATIC) 
@@ -105,10 +103,16 @@ c     fac=dble(nfft2d*nfft2d)
 !$OMP ENDDO 
 !$OMP END PARALLEL
 
-
-         call dfftw_execute_dft(plan2f,Eloinx,Eloinx)
-         call dfftw_execute_dft(plan2f,Eloiny,Eloiny)
-         call dfftw_execute_dft(plan2f,Eloinz,Eloinz)
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION           
+         CALL ZFFT2D(Eloinx,nfft2d,nfft2d,2)
+!$OMP SECTION            
+         CALL ZFFT2D(Eloiny,nfft2d,nfft2d,2)
+!$OMP SECTION         
+         CALL ZFFT2D(Eloinz,nfft2d,nfft2d,2)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
          
          kk=1+nx*ny*(k-1)
 

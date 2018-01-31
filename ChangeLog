@@ -1,21 +1,13 @@
 
-
-
-	10/01/18 : version 0.4.0	
-1) RAF: passe toutes les FFT avec FFTW sauf gaussianchampdfft
-2) supression de zfft 2d et 3d et kernel et produitfftmatvect2.f
-	dans cdmlib.pro
-3) Parallelisation de gaussian et gaussiand
-	
-----------------------------------------------------------
 	10/01/18 : version 0.3.7
 1) RAF: RUN_TBL "table run_tbl has 32 columns but 33 values were
 	supplied Unable to execute statement: corrige.
 2) RAF: nstop passe dans inverserig et son opt.
 3) Correction sur calcul lentille pour les options.
-	
+
+
 ----------------------------------------------------------
-	
+
 	19/12/17 : version 0.3.6
 
 1) Ajoute option pour ne pas ecrire les fichiers .mat et aller
@@ -42,7 +34,7 @@
 	produitfftmatvect2
 	produitfftmatvect3
 	produitfftmatvectopt
-
+3) Changement place Nrig  dans cdmOptions.cpp
 
 ---------------------------------------------------------
 	18/12/17 : version 0.3.5

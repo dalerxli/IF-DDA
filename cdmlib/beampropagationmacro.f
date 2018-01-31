@@ -1,7 +1,7 @@
       subroutine beampropagationmacro(xs,ys,zs,aretecube,k0,w0,E0,ss,pp
      $     ,theta,phi,xgaus,ygaus,zgaus,beam,epsilon,ndipole,nx,ny,nz
      $     ,nxm,nym,nzm ,nmax,nfft2d,imagex,imagey,imagez,FF0,FFloc,FF
-     $     ,plan2f,plan2b ,nstop,infostr)
+     $     ,nstop,infostr)
       
       implicit none
 
@@ -17,14 +17,12 @@ c     input data
       double precision xs(nmax),ys(nmax),zs(nmax),k0,w0,ss,pp,theta,phi
      $     ,aretecube,kz,kx,ky,deltakx,deltaky,fac,pi,kzc
       double complex epsilon(nmax,3,3),FFloc(3*nmax),FF(3*nmax),FF0(3
-     $     *nmax),icomp,Em(3),Eloc(3),epsani(3,3),expik0a
-      integer*8 plan2f,plan2b
+     $     *nmax),icomp,Em(3),Eloc(3),epsani(3,3)
 c     output data
 
       pi=dacos(-1.d0)
       icomp=(0.d0,1.d0)
-      expik0a=cdexp(icomp*k0*aretecube)
-      fac=1.d0/dble(nfft2d*nfft2d)
+      
 
 c     verifie taille fft
       if (nfft2d.le.nx) then
@@ -120,11 +118,16 @@ c     commence boucle sur les z
       do k=2,nz
          
 c     FFT à deux dimensions
-         
-         call dfftw_execute_dft(plan2b,Imagex,Imagex)
-         call dfftw_execute_dft(plan2b,Imagey,Imagey)
-         call dfftw_execute_dft(plan2b,Imagez,Imagez)
-
+!$OMP PARALLEL  DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL      
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,indice,ii,jj,kx,ky,kz,ctmp)
 !$OMP DO SCHEDULE(STATIC) COLLAPSE(2)       
@@ -162,9 +165,17 @@ c     FFT à deux dimensions
 !$OMP ENDDO 
 !$OMP END PARALLEL
 
-         call dfftw_execute_dft(plan2f,Imagex,Imagex)
-         call dfftw_execute_dft(plan2f,Imagey,Imagey)
-         call dfftw_execute_dft(plan2f,Imagez,Imagez)
+         
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,-1)
+!$OMP SECTION     
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,-1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,-1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL 
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,indice,x,y,ii,kk) 
 !$OMP DO SCHEDULE(STATIC) COLLAPSE(2) 
@@ -180,19 +191,19 @@ c     FFT à deux dimensions
                  
                
                   FFloc(kk+1)=Imagex(indice)*cdexp(icomp*k0
-     $                 *cdsqrt(epsilon(ii,1,1))*aretecube)*fac
+     $                 *cdsqrt(epsilon(ii,1,1))*aretecube)
                   FFloc(kk+2)=Imagey(indice)*cdexp(icomp*k0
-     $                 *cdsqrt(epsilon(ii,2,2))*aretecube)*fac
+     $                 *cdsqrt(epsilon(ii,2,2))*aretecube)
                   FFloc(kk+3)=Imagez(indice)*cdexp(icomp*k0
-     $                 *cdsqrt(epsilon(ii,3,3))*aretecube)*fac
+     $                 *cdsqrt(epsilon(ii,3,3))*aretecube)
 
                   Imagex(indice)=FFloc(kk+1)
                   Imagey(indice)=FFloc(kk+2)
                   Imagez(indice)=FFloc(kk+3)                 
                else
-                 Imagex(indice)=Imagex(indice)*expik0a
-                 Imagey(indice)=Imagey(indice)*expik0a
-                 Imagez(indice)=Imagez(indice)*expik0a
+                 Imagex(indice)=Imagex(indice)*cdexp(icomp*k0*aretecube)
+                 Imagey(indice)=Imagey(indice)*cdexp(icomp*k0*aretecube)
+                 Imagez(indice)=Imagez(indice)*cdexp(icomp*k0*aretecube)
                endif
             enddo
          enddo

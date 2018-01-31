@@ -3,7 +3,7 @@ c     routine optimiser pour le cube.
       subroutine produitfftmatvectopt(FFTTENSORxx,FFTTENSORxy
      $     ,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty
      $     ,vectz,ntotalm,ntotal,nmax,nxm,nym,nzm,nx,ny,nz,nx2,ny2,nxy2
-     $     ,nz2,FFX,FFB,planf,planb)
+     $     ,nz2,FFX,FFB)
       implicit none
       integer jj,i,j,k,indice,ntotal,ntotalm,nxm,nym,nzm,nx,ny,nz
      $     ,nmax,nx2,ny2,nxy2,nz2
@@ -13,13 +13,9 @@ c     routine optimiser pour le cube.
      $     *nmax),vectx(ntotalm) ,vecty(ntotalm),vectz(ntotalm)
       double complex ctmpx,ctmpy,ctmpz
       integer nxy
-      double precision dntotal
-      integer*8 planf,planb
 c      double precision t1,t2
 
       nxy=nx*ny
-      dntotal=dble(ntotal)
-      
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(indice) 
 !$OMP DO SCHEDULE(STATIC)      
       do indice=1,ntotal
@@ -46,11 +42,17 @@ c     position du dipole
       enddo
 !$OMP ENDDO 
 !$OMP END PARALLEL
-
-      call dfftw_execute_dft(planb, vectx, vectx)   
-      call dfftw_execute_dft(planb, vecty, vecty)     
-      call dfftw_execute_dft(planb, vectz, vectz)
-
+      
+!$OMP PARALLEL  DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION   
+      CALL ZFFT3D(vectx,NX2,NY2,NZ2,1)
+!$OMP SECTION      
+      CALL ZFFT3D(vecty,NX2,NY2,NZ2,1)
+!$OMP SECTION      
+      CALL ZFFT3D(vectz,NX2,NY2,NZ2,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL 
       
 !$OMP PARALLEL  DEFAULT(SHARED) PRIVATE(indice,ctmpx,ctmpy,ctmpz)   
 !$OMP DO SCHEDULE(STATIC)   
@@ -70,10 +72,17 @@ c     position du dipole
 
       
 c     FFT inverse (deconvolution)
-      call dfftw_execute_dft(planf, vectx, vectx)
-      call dfftw_execute_dft(planf, vecty, vecty)
-      call dfftw_execute_dft(planf, vectz, vectz)
-      
+!$OMP PARALLEL  DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION        
+      CALL ZFFT3D(vectx,nx2,ny2,nz2,-1)
+!$OMP SECTION      
+      CALL ZFFT3D(vecty,nx2,ny2,nz2,-1)
+!$OMP SECTION      
+      CALL ZFFT3D(vectz,nx2,ny2,nz2,-1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
+
 !$OMP PARALLEL  DEFAULT(SHARED) PRIVATE(indice,jj,i,j,k)
 !$OMP DO SCHEDULE(STATIC) COLLAPSE(3)               
       do k=1,nz
@@ -81,9 +90,9 @@ c     FFT inverse (deconvolution)
             do i=1,nx
                indice=i+nx2*(j-1)+nxy2*(k-1)
                jj=3*(i+nx*(j-1)+nxy*(k-1))
-               FFB(jj-2)=FFB(jj-2)-vectx(indice)/dntotal
-               FFB(jj-1)=FFB(jj-1)-vecty(indice)/dntotal
-               FFB(jj)=FFB(jj)-vectz(indice)/dntotal
+               FFB(jj-2)=FFB(jj-2)-vectx(indice)
+               FFB(jj-1)=FFB(jj-1)-vecty(indice)
+               FFB(jj)=FFB(jj)-vectz(indice)
             enddo
          enddo
       enddo

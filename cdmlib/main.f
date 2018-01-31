@@ -148,13 +148,13 @@ c********************************************************
 c********************************************************
 c     Defini le type d'onde incidente
 c********************************************************
-c      beam='pwavelinear'
+      beam='pwavelinear'
 c     beam='wavelinearmulti'
 c      beam='antenna'
 c     beam='pwavecircular'
 c     beam='gparawavecircular'
 c      beam='gparawavelinear'
-      beam='gwavelinear'  
+c      beam='gwavelinear'  
 c     beam='gwavecircular'
 c     beam='arbitrary' 
   
@@ -417,23 +417,23 @@ c********************************************************
                 !contenant l'objet 2 dans la boite nxm,nym,nzm
       nlocal=1!  1: calcul le champ local
       nmacro=1 !  1: calcul le champ macro
-      nsection=0! 1: calcul les sections efficaces
-      nsectionsca=0 !1: calcul C_sca, Poynting et g par rayonnement des dipoles
-      nquickdiffracte=0  !1: calcul C_sca, Poynting et g par avec la FFT
-      nforce=0 ! 1: Calul la force optique
-      nforced=0 ! 1: Calcul la densite de force
-      ntorque=0! 1: Calul le couple optique
-      ntorqued=0 ! 1: Calcul la densite de couple
+      nsection=1! 1: calcul les sections efficaces
+      nsectionsca=1 !1: calcul C_sca, Poynting et g par rayonnement des dipoles
+      nquickdiffracte=1  !1: calcul C_sca, Poynting et g par avec la FFT
+      nforce=1 ! 1: Calul la force optique
+      nforced=1 ! 1: Calcul la densite de force
+      ntorque=1! 1: Calul le couple optique
+      ntorqued=1 ! 1: Calcul la densite de couple
       nrig=0 ! 1: calcul le champ par Born renormalise, 0 rigoureux
       nlecture=0 !1: relis les dipoles deja calcules
 c      filereread='nom'
-      nlentille=0 !1 Calcul l'objet vu a travers une lentille situee du
+      nlentille=1 !1 Calcul l'objet vu a travers une lentille situee du
                   !cote des z positifs, foyer place a l'origine
       nquicklens=0!1: calcul avec FFT la vue a travers la lentille
       numaper=1.d0! ouverture numerique de la lentille
       nobjet=0! 1: calcul juste la forme de l'objet
       nquad=0 !0 -> 5 defini le niveau d'integration du tenseur
-      nenergie=0
+      nenergie=1
       nmat=0 ! écrit mat  file si 1 n ecrit pas
       gross=100.d0
       write(*,*) 'cdmlib',sidex,sidey,sidez

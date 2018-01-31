@@ -415,7 +415,7 @@ c*****************************************************************
       external Ipropagaussian,Ievagaussian
 
       common/comgaussian/aa,zz,kk0,ww0
-!$OMP THREADPRIVATE(/comgaussian/)
+
       if (nloin.gt.2.or.nloin.lt.0) then
          write(*,*) 'not right value of nloin',nloin
          stop
@@ -481,7 +481,7 @@ c*******************************************************************
       double complex cons,Imulti(nlda)
 
       common/comgaussian/a,z,k0,w0
-!$OMP THREADPRIVATE(/comgaussian/)     
+     
       kpara=dsqrt(k0-kz*kz)
       cons=w0*dexp(-kpara*kpara*w0/2.d0)*cdexp((0.d0,1.d0)*kz*z)    
       Imulti(1)=cons*kz*dbesj0(a*kpara)
@@ -498,7 +498,7 @@ c*******************************************************************
       double complex Imulti(nlda)
 
       common/comgaussian/a,z,k0,w0
-!$OMP THREADPRIVATE(/comgaussian/)           
+           
       kpara=dsqrt(k0+kz*kz)
       cons=w0*dexp(-kpara*kpara*w0/2.d0)*dexp(-kz*z)    
       Imulti(1)=cons*kz*dbesj0(a*kpara)

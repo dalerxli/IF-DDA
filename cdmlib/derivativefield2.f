@@ -4,23 +4,19 @@ c***************************************************************
       subroutine derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
      $     ,ntotal,ntotalm,nmax,DFFTTENSORxx,DFFTTENSORxy,DFFTTENSORxz
      $     ,DFFTTENSORyy,DFFTTENSORyz,DFFTTENSORzz,vectx,vecty,vectz
-     $     ,test,FF0,planb,planf)
+     $     ,test,FF0)
       implicit none
       integer i,j,k,ii,jj,kk,nx,ny,nz,nxy2,nx2,ny2,nz2,indice,nmax
      $     ,ntotal,ntotalm,test
-      double precision k0,x0,y0,z0,xx0,yy0,zz0,aretecube,dntotal
+      double precision k0,x0,y0,z0,xx0,yy0,zz0,aretecube
       double complex DFFTTENSORxx(ntotalm),DFFTTENSORxy(ntotalm)
      $     ,DFFTTENSORxz(ntotalm),DFFTTENSORyy(ntotalm)
      $     ,DFFTTENSORyz(ntotalm),DFFTTENSORzz(ntotalm),vectx(ntotalm)
      $     ,vecty(ntotalm),vectz(ntotalm),FF0(3*nmax),Stenseurd(3,3,3)
       double complex ctmpx,ctmpy,ctmpz
-      integer*8 planb,planf
-      
       xx0=0.d0
       yy0=0.d0
       zz0=0.d0
-      dntotal=dble(ntotal)
-      
 !$OMP PARALLEL DEFAULT(SHARED)
 !$OMP& PRIVATE(ii,jj,kk,indice,i,j,k,x0,y0,z0,Stenseurd)
 !$OMP DO SCHEDULE(STATIC) COLLAPSE(3)    
@@ -70,13 +66,23 @@ c***************************************************************
 !$OMP END PARALLEL
       
 c     Compute FFT
-
-      call dfftw_execute_dft(planb,DFFTTENSORxx,DFFTTENSORxx)
-      call dfftw_execute_dft(planb,DFFTTENSORxy,DFFTTENSORxy) 
-      call dfftw_execute_dft(planb,DFFTTENSORxz,DFFTTENSORxz)
-      call dfftw_execute_dft(planb,DFFTTENSORyy,DFFTTENSORyy)
-      call dfftw_execute_dft(planb,DFFTTENSORyz,DFFTTENSORyz)
-      call dfftw_execute_dft(planb,DFFTTENSORzz,DFFTTENSORzz)
+      
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION      
+      CALL ZFFT3D(DFFTTENSORxx,nx2,ny2,nz2,1)
+!$OMP SECTION      
+      CALL ZFFT3D(DFFTTENSORxy,nx2,ny2,nz2,1)
+ !$OMP SECTION     
+      CALL ZFFT3D(DFFTTENSORxz,nx2,ny2,nz2,1)
+ !$OMP SECTION     
+      CALL ZFFT3D(DFFTTENSORyy,nx2,ny2,nz2,1)
+ !$OMP SECTION     
+      CALL ZFFT3D(DFFTTENSORyz,nx2,ny2,nz2,1)
+!$OMP SECTION      
+      CALL ZFFT3D(DFFTTENSORzz,nx2,ny2,nz2,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL       
 
 c     product of the FFT
 !$OMP PARALLEL  DEFAULT(SHARED) PRIVATE(indice,ctmpx,ctmpy,ctmpz)
@@ -98,10 +104,17 @@ c     product of the FFT
 !$OMP END PARALLEL        
 
 c     FFT inverse (deconvolution)
-
-      call dfftw_execute_dft(planf,DFFTTENSORxx,DFFTTENSORxx)
-      call dfftw_execute_dft(planf,DFFTTENSORyy,DFFTTENSORyy)
-      call dfftw_execute_dft(planf,DFFTTENSORzz,DFFTTENSORzz)
+      
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION         
+      CALL ZFFT3D(DFFTTENSORxx,nx2,ny2,nz2,-1)
+!$OMP SECTION           
+      CALL ZFFT3D(DFFTTENSORyy,nx2,ny2,nz2,-1)
+!$OMP SECTION           
+      CALL ZFFT3D(DFFTTENSORzz,nx2,ny2,nz2,-1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL      
 
 c     remet le vecteur resultat dans FF0
 
@@ -112,9 +125,9 @@ c     remet le vecteur resultat dans FF0
             do i=1,nx
                indice=i+nx2*(j-1)+nxy2*(k-1)
                ii=3*(i+nx*(j-1)+nx*ny*(k-1))
-               FF0(ii-2)=DFFTTENSORxx(indice)/dntotal
-               FF0(ii-1)=DFFTTENSORyy(indice)/dntotal
-               FF0(ii)=DFFTTENSORzz(indice)/dntotal
+               FF0(ii-2)=DFFTTENSORxx(indice)
+               FF0(ii-1)=DFFTTENSORyy(indice)
+               FF0(ii)=DFFTTENSORzz(indice)
             enddo
          enddo
       enddo

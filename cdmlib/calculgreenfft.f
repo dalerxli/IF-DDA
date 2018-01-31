@@ -1,6 +1,6 @@
       subroutine greencalculfft(nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
      $     ,aretecube,k0,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz,FFTTENSORyy
-     $     ,FFTTENSORyz,FFTTENSORzz,planb)
+     $     ,FFTTENSORyz,FFTTENSORzz)
       implicit none
       integer nx,ny,nz,nx2,ny2,nz2,nxy2,nxm,nym,nzm
       double precision aretecube,k0
@@ -10,7 +10,7 @@
       integer ii,jj,kk,i,j,k,indice
       double precision x0,y0,z0,xx0,yy0,zz0
       double complex propaesplibre(3,3)
-      integer*8 planb
+
       x0=0.d0
       y0=0.d0
       z0=0.d0
@@ -66,16 +66,24 @@
 !$OMP ENDDO 
 !$OMP END PARALLEL
       
-      write(*,*) 'End computation of the Green function',planb
+      write(*,*) 'End computation of the Green function'
 c     compute the FFT of the Green function
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION            
+      CALL ZFFT3D(FFTTENSORxx,nx2,ny2,nz2,1)
+!$OMP SECTION         
+      CALL ZFFT3D(FFTTENSORxy,nx2,ny2,nz2,1)
+!$OMP SECTION         
+      CALL ZFFT3D(FFTTENSORxz,nx2,ny2,nz2,1)
+!$OMP SECTION         
+      CALL ZFFT3D(FFTTENSORyy,nx2,ny2,nz2,1)
+!$OMP SECTION
+      CALL ZFFT3D(FFTTENSORyz,nx2,ny2,nz2,1)
+!$OMP SECTION         
+      CALL ZFFT3D(FFTTENSORzz,nx2,ny2,nz2,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL
 
-      call dfftw_execute_dft(planb,FFTTENSORxx,FFTTENSORxx)
-      call dfftw_execute_dft(planb,FFTTENSORxy,FFTTENSORxy) 
-      call dfftw_execute_dft(planb,FFTTENSORxz,FFTTENSORxz)
-      call dfftw_execute_dft(planb,FFTTENSORyy,FFTTENSORyy)
-      call dfftw_execute_dft(planb,FFTTENSORyz,FFTTENSORyz)
-      call dfftw_execute_dft(planb,FFTTENSORzz,FFTTENSORzz)
-      
 
-      write(*,*) 'End FFT Green function'
       end

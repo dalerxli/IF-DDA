@@ -1,7 +1,7 @@
       subroutine gaussianchampfft(xs,ys,zs,aretecube,k0,w0,E0,ss,pp
      $     ,theta,phi,xgaus,ygaus,zgaus,beam,ndipole,nx,ny,nz,nxm,nym
-     $     ,nzm ,nmax,nfft2d,imagex,imagey,imagez,FF0,tolinit,plan2f
-     $     ,plan2b,nstop ,infostr)
+     $     ,nzm ,nmax,nfft2d,imagex,imagey,imagez,FF0,tolinit,nstop
+     $     ,infostr)
       
       implicit none
 
@@ -20,7 +20,6 @@ c     input data
       double complex FF0(3*nmax),icomp,Ex,Ey,Ez,fac
 c     output data
       character(64) beam
-      integer*8 plan2f ,plan2b
       
       pi=dacos(-1.d0)
       icomp=(0.d0,1.d0)
@@ -28,8 +27,7 @@ c     output data
       quatpieps0=1.d0/(c*c*1.d-7)
       lambda=2.d0*pi/k0
       nxy=nx*ny
-      fac=1.d0/dble(nfft2d*nfft2d)
-      
+
 c     arret si theta trop fort car ne prend que les kz positifs
       if (dabs(theta).ge.45.d0) then
          infostr='Angle too large for fft gaussian'
@@ -67,7 +65,7 @@ c     verifie taille fft
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i)
 !$OMP DO SCHEDULE(STATIC) REDUCTION(max:xmax,ymax)
-!$OMP& REDUCTION(min:xmin,ymin)
+!OMP& REDUCTION(min:xmin,ymin)
       do i=1,ndipole
          xmax=max(xmax,xs(i))
          xmin=min(xmin,xs(i))
@@ -114,9 +112,17 @@ c     intialise le premier z au champ incident avec la phase
       enddo
 
 c     calcul premiere couche en filtrant les frequences hors propagatives
-      call dfftw_execute_dft(plan2b,Imagex,Imagex)
-      call dfftw_execute_dft(plan2b,Imagey,Imagey)
-      call dfftw_execute_dft(plan2b,Imagez,Imagez)
+!$OMP PARALLEL DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL   
+
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,indice,ii,jj,kx,ky,kz)
 !$OMP DO  SCHEDULE(STATIC) COLLAPSE(2)          
@@ -140,20 +146,23 @@ c     calcul premiere couche en filtrant les frequences hors propagatives
                   Imagex(indice)=0.d0
                   Imagey(indice)=0.d0
                   Imagez(indice)=0.d0
-               else
-                  Imagex(indice)=Imagex(indice)*fac
-                  Imagey(indice)=Imagey(indice)*fac
-                  Imagez(indice)=Imagey(indice)*fac
                endif
             enddo
          enddo
 !$OMP ENDDO 
 !$OMP END PARALLEL
 
-         call dfftw_execute_dft(plan2f,Imagex,Imagex)
-         call dfftw_execute_dft(plan2f,Imagey,Imagey)
-         call dfftw_execute_dft(plan2f,Imagez,Imagez)
-         
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,-1)
+!$OMP SECTION     
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,-1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,-1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL 
+
 !$OMP PARALLEL  DEFAULT(SHARED) PRIVATE(i,j,indice,x,y,ii,kk)
 !$OMP DO SCHEDULE(DYNAMIC) COLLAPSE(2) 
          do j=1,nfft2d
@@ -181,12 +190,21 @@ c     commence boucle sur les z
       do k=2,nz
 
 c     FFT à deux dimensions
-         call dfftw_execute_dft(plan2b,Imagex,Imagex)
-         call dfftw_execute_dft(plan2b,Imagey,Imagey)
-         call dfftw_execute_dft(plan2b,Imagez,Imagez)
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL      
+
+
          
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,indice,ii,jj,kx,ky,kz,ctmp)
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)      
+!$OMP DO SCHEDULE(DYNAMIC) COLLAPSE(2)      
          do j=1,nfft2d
             do i=1,nfft2d
                indice=i+nfft2d*(j-1)
@@ -221,12 +239,19 @@ c     FFT à deux dimensions
 !$OMP ENDDO 
 !$OMP END PARALLEL
 
-         call dfftw_execute_dft(plan2f,Imagex,Imagex)
-         call dfftw_execute_dft(plan2f,Imagey,Imagey)
-         call dfftw_execute_dft(plan2f,Imagez,Imagez)
-         
+!$OMP PARALLEL  DEFAULT(SHARED)
+!$OMP SECTIONS 
+!$OMP SECTION   
+         CALL ZFFT2D(Imagex,nfft2d,nfft2d,-1)
+!$OMP SECTION     
+         CALL ZFFT2D(Imagey,nfft2d,nfft2d,-1)
+!$OMP SECTION 
+         CALL ZFFT2D(Imagez,nfft2d,nfft2d,-1)
+!$OMP END SECTIONS
+!$OMP END PARALLEL 
+
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i,j,x,y,ii,kk)
-!$OMP DOSCHEDULE(STATIC) COLLAPSE(2) 
+!$OMP DOSCHEDULE(DYNAMIC) COLLAPSE(2) 
          do j=1,nfft2d
             do i=1,nfft2d         
                indice=i+(j-1)*nfft2d
@@ -238,9 +263,9 @@ c     FFT à deux dimensions
                   ii=nxy*(k-1)+tabfft(indice)
                   kk=3*(ii-1)
                 
-                  FF0(kk+1)=Imagex(indice)*fac
-                  FF0(kk+2)=Imagey(indice)*fac
-                  FF0(kk+3)=Imagez(indice)*fac
+                  FF0(kk+1)=Imagex(indice)
+                  FF0(kk+2)=Imagey(indice)
+                  FF0(kk+3)=Imagez(indice)
                   
                endif
             enddo

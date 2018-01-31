@@ -1,6 +1,5 @@
       subroutine fouriertoimage(deltakx,deltaky,Eimagex,Eimagey,Eimagez
-     $     ,Eimageincx,Eimageincy,Eimageincz,nfft2D,nfft2d2,plan2b
-     $     ,plan2f)
+     $     ,Eimageincx,Eimageincy,Eimageincz,nfft2D,nfft2d2)
       
       implicit none
       integer nfft2D,nfft2d2
@@ -12,15 +11,27 @@
       integer i,j,indicex,indicey,indice,kk
       double precision tmp
       double complex ctmp
-      integer*8 plan2f,plan2b
+      
       tmp=deltakx*deltaky
 
-      call dfftw_execute_dft(plan2b,Eimageincx,Eimageincx)
-      call dfftw_execute_dft(plan2b,Eimageincy,Eimageincy)
-      call dfftw_execute_dft(plan2b,Eimageincz,Eimageincz)
-      call dfftw_execute_dft(plan2b,Eimagex,Eimagex)
-      call dfftw_execute_dft(plan2b,Eimagey,Eimagey)
-      call dfftw_execute_dft(plan2b,Eimagez,Eimagez)
+c     Compute the FFT inverse to get the image through the microscope
+!$OMP PARALLEL DEFAULT(SHARED) 
+!$OMP SECTIONS 
+!$OMP SECTION            
+      CALL ZFFT2D(Eimageincx,nfft2D,nfft2D,1)
+!$OMP SECTION         
+      CALL ZFFT2D(Eimageincy,nfft2D,nfft2D,1)
+!$OMP SECTION          
+      CALL ZFFT2D(Eimageincz,nfft2D,nfft2D,1)
+!$OMP SECTION            
+      CALL ZFFT2D(Eimagex,nfft2D,nfft2D,1)
+!$OMP SECTION         
+      CALL ZFFT2D(Eimagey,nfft2D,nfft2D,1)
+!$OMP SECTION          
+      CALL ZFFT2D(Eimagez,nfft2D,nfft2D,1)         
+!$OMP END SECTIONS
+!$OMP END PARALLEL
+      
       
 !$OMP PARALLEL DEFAULT(SHARED)
 !$OMP& PRIVATE(i,j,indicex,indicey,indice,kk,ctmp)
