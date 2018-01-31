@@ -1,0 +1,3627 @@
+c     Fortran library subroutine entry point
+
+      SUBROUTINE cdmlib(
+c     input file cdm.in
+     $     lambda,beam,object,trope,
+     $     materiaumulti,nnnr,tolinit,methodeit,polarizability,
+     $     nquad,nlecture,filereread,
+c     output file cdm.out
+     $     nlocal,nmacro,nsection,nsectionsca,nquickdiffracte,nrig,
+     $     nforce,nforced,ntorque,ntorqued,nproche,nlentille,nquicklens
+     $     ,nobjet,
+c     cube, sphere (includes multiple)
+     $     side, sidex, sidey, sidez, hauteur,
+     $     numberobjet, rayonmulti, xgmulti, ygmulti, zgmulti,
+     $     epsmulti, epsanimulti,lc,hc,ng,
+c     ellipsoid+arbitrary
+     $     demiaxea,demiaxeb,demiaxec,thetaobj,phiobj,psiobj,
+     $     namefileobj,
+c     planewavecircular.in / planewavelinear.in files
+     $     theta, phi, pp, ss, P0, w0, xgaus, ygaus, zgaus,namefileinc,
+c     return info stringf
+     $     infostr, nstop,
+c     return scalar results
+     $     nbsphere, ndipole, aretecube,
+     $     lambda10n, k0, tol1, ncompte, nloop,
+     $     Cext, Cabs, Csca, Cscai, gasym, irra, E0,
+     $     forcet, forcem,
+     $     couplet, couplem,
+     $     nxm, nym, nzm,
+     $     incidentfield, localfield, macroscopicfield,
+     $     xs, ys, zs, xswf, yswf, zswf,
+     $     ntheta, nphi, thetafield, phifield, poyntingfield,
+     $     forcex,forcey,forcez,forcexmulti,forceymulti,forcezmulti,
+     $     torquex,torquey,torquez,torquexmulti,torqueymulti,
+     $     torquezmulti,
+     $     incidentfieldx, incidentfieldy, incidentfieldz,
+     $     localfieldx, localfieldy, localfieldz,
+     $     macroscopicfieldx, macroscopicfieldy, macroscopicfieldz,
+     $     polarisa,epsilon,
+     $     nfft2d,Eimagex,Eimagey,Eimagez,Eimageincx,Eimageincy,
+     $     Eimageincz,Efourierx,Efouriery,Efourierz,kxy,xy,numaper,gross
+     $     ,
+c****************************************************
+c     tableaux utilises que dans cdmlib
+c****************************************************
+c     taille double complex (3*nxm*nym*nzm)
+     $     FF,FF0,FFloc,xr,xi,
+c     taille double complex (3*nxm*nym*nzm,12)
+     $     wrk,
+c     taille double real (nxm*nym*nzm,3)
+     $     force,couple,
+c     taille double complex (8*nxm*nym*nzm)
+     $     FFTTENSORxx, FFTTENSORxy,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,
+     $     FFTTENSORzz,vectx,vecty,vectz,
+c     taille double complex (nfft2d,nfft2d,3)
+     $     Ediffkzpos,Ediffkzneg,
+c     taille entier (nxm*nym*nzm)
+     $     Tabdip,Tabmulti)
+
+      implicit none
+      
+c     integer
+      integer ii,jj,kk,ll,i,j,k,l,cnt,nstop,cntwf,kkm,jjm,iim
+      integer  nlocal,nmacro,nsection,nsectionsca,nforce ,nforced
+     $     ,nquickdiffracte,ntorque,ntorqued,nsens,nproche,nprochefft
+     $     ,nlecture,nlecture1,long,long1,ierror,nrig,nquicklens,nquad
+
+c     variables for the object
+      integer nbsphere3,nbsphere,ndipole,test,numberobjetmax
+     $     ,numberobjet,is,ng
+      parameter (numberobjetmax=20)
+      integer nx,ny,nz,nx2,ny2,nxy2,nz2,nxm,nym,nzm,ntotal,nxm2,nym2
+     $     ,nzm2,nxym2
+      integer subunit,nsubunit,comparaison
+c     definition of the size for the code
+      INTEGER nmax, ntotalm
+
+c     variables for the positions
+      double precision x0,y0,z0,x,y,z,xx0,yy0,zz0,xmin,xmax,ymin,ymax
+     $     ,zmin,zmax,rayon,side,sidex,sidey,sidez,hauteur
+     $     ,xgmulti(numberobjetmax),ygmulti(numberobjetmax)
+     $     ,zgmulti(numberobjetmax),rayonmulti(numberobjetmax),demiaxea
+     $     ,demiaxeb,demiaxec,thetaobj,phiobj,psiobj
+      double precision aretecube
+      integer iphi,itheta,nphi,ntheta
+      DOUBLE PRECISION,DIMENSION(nxm*nym*nzm)::xs,ys,zs
+      DOUBLE PRECISION,DIMENSION(nxm*nym*nzm)::xswf,yswf,zswf
+      
+      double precision pi,lambda,lambda10n,k0,k03,epi,epr,c
+
+c     variables for the material
+      double precision eps0,quatpieps0
+      double complex, dimension(nxm*nym*nzm,3,3) :: polarisa,epsilon
+      double complex eps,epsani(3,3),epsmulti(numberobjetmax)
+     $     ,epsanimulti(numberobjetmax,3,3)
+      character(2) polarizability
+      character (64), DIMENSION(numberobjetmax) :: materiaumulti
+      character(64) materiau,object,beam,namefileobj,namefileinc
+     $     ,filereread,filereread1
+      character(3) trope,file1
+c     variables for the incident field and local field
+      DOUBLE PRECISION, DIMENSION(nxm*nym*nzm) :: incidentfield,
+     $     localfield,macroscopicfield,forcex,forcey,forcez, torquex
+     $     ,torquey,torquez
+      double precision forcexmulti(numberobjetmax)
+     $     ,forceymulti(numberobjetmax),forcezmulti(numberobjetmax)
+     $     ,torquexmulti(numberobjetmax),torqueymulti(numberobjetmax)
+     $     ,torquezmulti(numberobjetmax)
+      
+      double precision ss,pp,theta,phi,I0,Emod,tmp,thetag
+      double complex Eloc(3),Em(3),E0,uncomp,icomp,zzero,Emx,Emy,Emz
+      double complex, dimension(nxm*nym*nzm) :: macroscopicfieldx
+      double complex, dimension(nxm*nym*nzm) :: macroscopicfieldy
+      double complex, dimension(nxm*nym*nzm) :: macroscopicfieldz
+      double complex, dimension(nxm*nym*nzm) :: localfieldx
+      double complex, dimension(nxm*nym*nzm) :: localfieldy
+      double complex, dimension(nxm*nym*nzm) :: localfieldz
+      double complex, dimension(nxm*nym*nzm) :: incidentfieldx
+      double complex, dimension(nxm*nym*nzm) :: incidentfieldy
+      double complex, dimension(nxm*nym*nzm) :: incidentfieldz
+      double complex propaesplibre(3,3)
+      double complex, dimension(3*nxm*nym*nzm) :: FF,FF0,FFloc
+
+c     Green function
+      integer, dimension(nxm*nym*nzm) :: Tabdip,Tabmulti
+      integer indice,indicex,indicey
+      double complex, dimension(8*nxm*nym*nzm) :: FFTTENSORxx,
+     $     FFTTENSORxy,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,
+     $     FFTTENSORzz,vectx,vecty,vectz
+c     Variables for the computation of the optical force and torque
+      double precision, dimension(nxm*nym*nzm,3) :: force,couple
+
+      double precision forcet(3),forcem
+      double precision couplet(3),couplem,xg,yg,zg,lc,hc
+      double complex Eder(3,3)
+      
+c     computation of the cross section
+      integer imaxk0
+      double precision Cext,normal(3),deltatheta,deltaphi,Csca,Cscai
+     $     ,Cabs,gasym,thetas,phis,u1,u2
+      double complex ctmp,ctmp1
+      
+c     variables for the iterative method
+      INTEGER ldabi, nlar
+      integer nnnr,ncompte,nt,IP(3)
+      integer NLIM,ndim,nou,nstat,nloop,STEPERR
+      DOUBLE PRECISION  NORM,TOL,tolinit,tol1,tole ,RELREQ ,lim
+      double complex ALPHA,BETA,GPETA,DZETA,R0RN,QMR1,QMR2,QMR3,QMR4
+     $     ,QMR5,QMR6,QMR7,QMR8,QMR9
+      double complex DOTS(4)
+
+      
+      double complex, dimension(3*nxm*nym*nzm) :: xr,xi
+      double complex, dimension(3*nxm*nym*nzm,12) :: wrk
+      
+c     Poynting vector
+      integer i2,j2,ii2,jj2
+      double precision Poyntinginc
+
+c     Info string
+      character(64) infostr
+
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     nouvelle variable a passer en argument d'entree
+c     power et diametre
+      double precision P0,w0,xgaus,ygaus,zgaus,xdip,ydip,zdip
+      character(12) methodeit
+
+c     nouvelle variable de sortie Irra     
+      double precision irra
+      
+c     nouvelle variable
+      integer nloin
+      
+c     variable pour avoir l'image a travers la lentille
+      integer nlentille,nobjet,nfft2d,nfft2d2
+      double precision kx,ky,kz,deltakx,deltaky,numaper,deltax,gross
+
+      DOUBLE PRECISION,DIMENSION(max((ntheta+1)*nphi,nfft2d
+     $     *nfft2d))::thetafield,phifield,poyntingfield
+      double complex Ediffkzpos(nfft2d,nfft2d,3),Ediffkzneg(nfft2d
+     $     ,nfft2d,3)
+      double precision kxy(nfft2d),xy(nfft2d)
+      double complex Eimagex(nfft2d*nfft2d),Eimagey(nfft2d*nfft2d)
+     $     ,Eimagez(nfft2d*nfft2d),Eimageincx(nfft2d*nfft2d)
+     $     ,Eimageincy(nfft2d *nfft2d) ,Eimageincz(nfft2d*nfft2d)
+     $     ,Efourierx(nfft2d*nfft2d) ,Efouriery(nfft2d*nfft2d)
+     $     ,Efourierz(nfft2d*nfft2d),Efourierincx(nfft2d*nfft2d)
+     $     ,Efourierincy(nfft2d*nfft2d) ,Efourierincz(nfft2d*nfft2d)
+      double precision t1,t2
+
+c     variables pour le temps
+      character(8)  :: date
+      character(10) :: time
+      character(5)  :: zone
+      integer,dimension(8) :: values,values2
+      
+c     FF0 : champ incident
+c     FF  : dipole
+c     FFloc : champ local
+
+      write(*,*) '*************** INPUT DATA ***************'
+      write(*,*) 'Wavelength       :',lambda
+      write(*,*) 'Beam             : ',beam
+      write(*,*) 'Object           : ',object,'iso',trope
+      write(*,*) 'Discretization   : ',nnnr
+      write(*,*) 'Iterative method : ',methodeit,'tolerance asked'
+     $     ,tolinit
+      write(*,*) 'Local field      : ',nlocal
+      write(*,*) 'Macroscopic field: ',nmacro
+      write(*,*) 'Cross section    : ',nsection,'Csca',nsectionsca
+      write(*,*) 'Lens             : ',nlentille
+      write(*,*) 'Optical force    : ',nforce ,nforced
+      write(*,*) 'Optical torque   : ' ,ntorque ,ntorqued
+      write(*,*) 'Near field       : ',nproche
+      write(*,*) 'Polarizability   : ',polarizability
+      materiau = materiaumulti(1)
+c     ne fait rien
+      if (nobjet.eq.0.and.nlocal.eq.0.and.nmacro.eq.0
+     $     .and.nsection.eq.0.and.nsectionsca.eq.0
+     $     .and.nforce.eq.0.and.nforced.eq.0
+     $     .and.ntorque.eq.0.and.ntorqued.eq.0
+     $     .and.nlentille.eq.0) then 
+         infostr='No calculation requested!'
+         nstop = 1;
+         return
+      endif
+c     calculation size parameter initialization
+      nmax = nxm*nym*nzm
+      ntotalm = 8*nxm*nym*nzm
+      ldabi = 3*nxm*nym*nzm
+      nlar = 12
+      nstop=0
+
+      xg = xgmulti(1)
+      yg = ygmulti(1)
+      zg = zgmulti(1)
+      rayon = rayonmulti(1)
+      eps = epsmulti(1)
+      epsani = epsanimulti(1,:,:)
+      write(*,*) 'coucou7'
+c     do k=1,nmax
+c     do i=1,3
+c     do j=1,3
+c     write(*,*) 'epsilonfield[',k,'][',i,'][',j,']=',epsilon(k,i,j)
+c     enddo
+c     enddo
+c     enddo
+c     wrk_p = MALLOC ( 4*3*nxm*nym*nzm ) 
+c     xi_p = MALLOC ( 4*3*nxm*nym*nzm ) 
+c     xr_p = MALLOC ( 4*3*nxm*nym*nzm ) 
+c     b_p = MALLOC ( 4*3*nxm*nym*nzm ) 
+      if (nmax.lt.8) then
+         nstop=1
+         infostr='Check Nxm Nym and Nzm!'
+         return
+      endif
+
+      if (nnnr.lt.2) then
+         nstop=1
+         write(*,*) 'There is no discretization!'
+         infostr='There is no discretization!'
+         return
+      endif
+ 
+      if (tolinit.lt.1.d-12) then 
+         infostr='Tolerance too small!'
+         nstop = 1;
+         return
+      endif
+      if (tolinit.gt.0.1d0) then 
+         infostr='Tolerance too large!'
+         nstop = 1;
+         return
+      endif
+      write(*,*) 'coucou5'
+c     open the output file:
+      open(99,file='output')
+      write(99,*) '************* OUTPUT FILE ***************'
+
+c     Intensity of the incident field
+      open(36,file='incidentfieldx.mat')
+      open(37,file='incidentfieldy.mat')
+      open(38,file='incidentfieldz.mat')
+      open(39,file='incidentfield.mat')
+c     Intensity of the local field
+      open(40,file='localfieldx.mat')
+      open(41,file='localfieldy.mat')
+      open(42,file='localfieldz.mat')
+      open(43,file='localfield.mat')
+c     Intensity of the macroscopic field
+      open(44,file='macroscopicfieldx.mat')
+      open(45,file='macroscopicfieldy.mat')
+      open(46,file='macroscopicfieldz.mat')
+      open(47,file='macroscopicfield.mat')
+c     Intensity of the incident field
+      open(136,file='incidentfieldxwf.mat')
+      open(137,file='incidentfieldywf.mat')
+      open(138,file='incidentfieldzwf.mat')
+      open(139,file='incidentfieldwf.mat')
+c     Intensity of the local field
+      open(140,file='localfieldxwf.mat')
+      open(141,file='localfieldywf.mat')
+      open(142,file='localfieldzwf.mat')
+      open(143,file='localfieldwf.mat')
+c     Intensity of the macroscopic field
+      open(144,file='macroscopicfieldxwf.mat')
+      open(145,file='macroscopicfieldywf.mat')
+      open(146,file='macroscopicfieldzwf.mat')
+      open(147,file='macroscopicfieldwf.mat')
+c     Far field discretization
+      open(67,file='xwf.mat')
+      open(68,file='ywf.mat')
+      open(69,file='zwf.mat')
+c     save the Poynting vecteur
+      open(50,file='poynting.mat')
+      open(51,file='theta.mat')
+      open(52,file='phi.mat')
+c     pour FFT
+      open(53,file='poyntingpos.mat')
+      open(54,file='poyntingneg.mat')
+      open(55,file='kx.mat')
+      open(56,file='ky.mat')
+
+c     save the density of the optical force
+      open(60,file='forcex.mat')
+      open(61,file='forcey.mat')
+      open(62,file='forcez.mat')
+c     save the density of optical torque
+      open(63,file='torquex.mat')
+      open(64,file='torquey.mat')
+      open(65,file='torquez.mat')
+c     save epsilon
+      open(66,file='epsilon.mat')
+c     initialization of the data
+      icomp=(0.d0,1.d0)
+      uncomp=(1.d0,0.d0)
+      pi=dacos(-1.d0)
+      zzero=(0.d0,0.d0)
+      c=299792458.d0
+      eps0=1.d0
+      quatpieps0=1.d0/(c*c*1.d-7)
+      infostr='STARTED!'
+      
+c     transform the input data in meter
+      lambda=lambda*1.d-9
+      w0=w0*1.d-9
+      write(*,*) 'coucou4'
+
+      if (w0.le.0.d0) then
+         nstop=1
+         infostr='waist=0!'
+         return
+      endif
+      if (P0.le.0.d0) then
+         nstop=1
+         infostr='Power=0!'
+         return
+      endif
+
+c     compute the relative permittivity fron a database versus the
+c     wavelength of illumination
+c     write(*,*) 'Relative permittivity',eps,materiau(1:2),lambda
+      write(*,*) 'coucou3'
+      do k=1,numberobjet
+         materiau = materiaumulti(k)
+         if (materiau(1:2).ne.'xx') then
+            
+            call interpdielec(lambda,materiau,epr,epi,infostr,nstop)
+            if (nstop.eq.1) return
+            epsmulti(k)=(epr*uncomp+icomp*epi)
+            write(99,*) 'Relative permittivity',eps
+            write(99,*) 'Relative permittivity',eps,materiau(1:2),lambda
+         else
+            if (trope(1:3).eq.'iso') then
+               write(*,*) 'Relative permittivity',eps
+               write(99,*) 'Relative permittivity',eps
+            else 
+               do i=1,3
+                  do j=1,3
+                     write(*,*) 'Relative permittivity',epsani(i,j),i,j
+                     write(99,*) 'Relative permittivity',epsani(i,j),i,j
+                  enddo
+               enddo
+            endif
+         endif
+      enddo
+      write(*,*) 'coucou2'
+c     test pour voir si la permittivite a un sens
+      do k=1,numberobjet
+         if (trope(1:3).eq.'iso') then
+            if (dreal(epsmulti(k)).eq.1.d0 .and.
+     $           dimag(epsmulti(k)).eq.0.d0) then
+               infostr='Object is in vacuum'
+               nstop=1
+            elseif (cdabs(epsmulti(k)).eq.0.d0) then
+               infostr='No relative permittivity given'
+               nstop=1
+            endif
+         else
+            tmp=0.d0
+            do ii=1,3
+               do jj=1,3
+                  tmp=tmp+cdabs(epsani(ii,jj))
+               enddo
+            enddo
+            if (tmp.eq.0.d0) then
+               infostr='No relative permittivity given'
+               nstop=1
+            endif
+c     Pour la pola tensorielle uniquement CR et CM disponible
+            if (polarizability.ne.'RR'.and.polarizability.ne.'CM') then
+               infostr
+     $              ='Polarizability should be CM or RR with anisotropy'
+               nstop=1
+            endif
+         endif
+      enddo
+      if (nstop.eq.1) return
+
+      eps = epsmulti(1)
+      materiau = materiaumulti(1)
+      write(*,*) 'coucou1'
+c     wavenumber
+      k0=2.d0*pi/lambda
+      k03=k0*k0*k0
+c     look  for compute near field with FFT
+      write(*,*) 'nearfield = ',nproche
+      write(*,*) 'nmax = ',nmax
+      write(*,*) 'nnnr = ',nnnr
+      if (nlecture.eq.1.and.nproche.eq.-1) nproche=0
+      if (nquickdiffracte.eq.1.and.nproche.eq.-1) nproche=0
+      if (nquicklens.eq.1.and.nproche.eq.-1) nproche=0
+      nprochefft=0
+      if (nproche.ge.1) then
+         nprochefft=nproche
+         nproche=0
+      endif      
+      write(*,*) 'Built the object : ',object(1:20)
+c     Built the object
+      if (object(1:6).eq.'sphere') then
+         numberobjet=1
+         call objetsphere(trope,eps,epsani,eps0,xs,ys,zs,k0,aretecube
+     $        ,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,polarizability
+     $        ,nproche,epsilon,polarisa,rayon,xg,yg,zg,infostr,nstop)
+         write(99,*) 'sphere',rayon
+      elseif (object(1:6).eq.'inhomo') then
+         numberobjet=1
+
+         if (trope.ne.'iso') then
+            nstop=1
+            infostr='Permittivity not scalar for inhomogenous sphere'
+            write(99,*)
+     $           'Permittivity not scalar for inhomogenous sphere'
+            return
+         endif
+            
+         
+         call objetsphereinhomo(eps,eps0,xs,ys,zs,k0 ,aretecube ,tabdip
+     $        ,nnnr,nmax,nbsphere,ndipole,nx,ny,nz ,polarizability
+     $        ,nproche,epsilon,polarisa,rayon,lc,hc ,ng
+     $        ,macroscopicfieldx ,infostr ,nstop)
+
+         write(99,*) 'inhomogenous sphere',rayon,lc,hc,ng
+
+         macroscopicfieldx=0.d0
+      elseif (object(1:4).eq.'cube') then
+         write(99,*) 'cube:side',side
+         write(*,*) 'cube:side',side
+         numberobjet=1
+         call objetcube(trope,eps,epsani ,eps0,xs,ys,zs,k0,aretecube
+     $        ,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,polarizability
+     $        ,epsilon,polarisa,side,xg,yg,zg,infostr,nstop)
+      elseif(object(1:6).eq.'cuboid') then
+         write(99,*) 'cuboid:sidex,sidey,sizez ',sidex,sidey,sidez
+         write(*,*) 'cuboid:sidex,sidey,sizez ',sidex,sidey,sidez
+         numberobjet=1
+         call objetpara(trope,eps,epsani,eps0,xs,ys,zs,k0,aretecube
+     $        ,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,nxm,nym,nzm
+     $        ,polarizability ,epsilon,polarisa,sidex,sidey,sidez,xg,yg
+     $        ,zg,phiobj ,thetaobj,psiobj,nproche,infostr,nstop)
+         write(99,*) 'side',sidex,sidey,sidez,nx,ny,nz
+         write(*,*) trope,eps,epsani,eps0,k0,aretecube ,nnnr,nmax
+     $        ,nbsphere,ndipole,nx,ny,nz,polarizability,sidex,sidey
+     $        ,sidez,xg,yg,zg,phiobj ,thetaobj ,psiobj,nproche,infostr
+     $        ,nstop
+      elseif(object(1:9).eq.'ellipsoid') then
+         numberobjet=1
+         call objetellipse(trope,eps,epsani,eps0,xs,ys,zs,k0 ,aretecube
+     $        ,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,nxm,nym,nzm
+     $        ,polarizability ,nproche,epsilon,polarisa,demiaxea
+     $        ,demiaxeb,demiaxec,xg ,yg,zg,phiobj,thetaobj,psiobj
+     $        ,infostr,nstop)
+         write(99,*) 'ellipse',nbsphere,ndipole,nx,ny,nz
+      elseif(object(1:8).eq.'nspheres') then
+         call objetnspheres(trope,epsmulti,epsanimulti,numberobjet
+     $        ,numberobjetmax,xgmulti,ygmulti,zgmulti,rayonmulti,eps0,xs
+     $        ,ys,zs,k0 ,aretecube,tabdip,tabmulti,nnnr,nmax,nbsphere
+     $        ,ndipole,nx,ny,nz,polarizability,nproche ,epsilon,polarisa
+     $        ,infostr,nstop)
+         write(99,*) 'multisphere',nbsphere,ndipole,nx,ny,nz
+      elseif(object(1:8).eq.'cylinder') then
+         numberobjet=1
+         call objetcylindre(trope,eps,epsani,eps0,xs,ys,zs,k0 ,aretecube
+     $        ,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz,nxm,nym,nzm
+     $        ,polarizability,nproche,epsilon,polarisa,rayon ,hauteur,xg
+     $        ,yg,zg,phiobj,thetaobj,psiobj,infostr,nstop)
+         write(99,*) 'cylindre',nbsphere,ndipole,nx,ny,nz
+      elseif(object(1:16).eq.'concentricsphere') then
+         call objetsphereconcentric(trope,epsmulti,epsanimulti
+     $        ,numberobjet,numberobjetmax,xg,yg,zg,rayonmulti,eps0,xs,ys
+     $        ,zs,k0,aretecube,tabdip,tabmulti,nnnr,nmax,nbsphere
+     $        ,ndipole,nx,ny,nz,polarizability,nproche
+     $        ,epsilon,polarisa,infostr,nstop)
+         write(99,*) 'concentricsphere',nbsphere,ndipole,nx,ny,nz
+      elseif(object(1:9).eq.'arbitrary') then
+         numberobjet=1
+         call objetarbitrary(trope,eps,epsani,eps0,xs,ys,zs,k0
+     $        ,aretecube,tabdip,nnnr,nmax,nbsphere,ndipole,nx,ny,nz
+     $        ,polarizability,namefileobj,nproche,epsilon ,polarisa
+     $        ,infostr,nstop)
+         write(99,*) 'arbitrary',nbsphere,ndipole,nx,ny,nz
+      else
+         write(99,*) 'Object unknown'
+         infostr='Object unknown!'
+         nstop=1
+         return
+      endif
+      write(*,*) 'Object under study created : ',object,nstop
+      if (nstop.eq.1) return
+c      if (nnnr*nnnr*nnnr.gt.nmax) then
+c         nstop=1
+c         write(*,*) 'nxm nym and nzm too small'
+c         infostr
+c     $    ='nxm nym and nzm too small compare to the discretization'
+c         return
+c      endif
+
+      
+      if (nx.gt.nxm.or.ny.gt.nym.or.nz.gt.nzm) then
+         nstop=1
+         infostr='Dimension Problem of the Box : Box too small!'
+         write(99,*) 'dimension Problem',nx,nxm,ny,nym,nz,nzm
+         write(*,*) 'dimension Problem',nx,nxm,ny,nym,nz,nzm
+         return
+      endif
+      if (nx.le.1.or.ny.le.1.or.nz.le.1) then
+         nstop=1
+         infostr='Dimension Problem nx ny nz too small!'
+         write(99,*) 'dimension Problem',nx,nxm,ny,nym,nz,nzm
+         write(*,*) 'dimension Problem',nx,nxm,ny,nym,nz,nzm
+         return
+      endif
+      if (nstop.eq.1) return
+      if (nstop == -1) then
+         infostr = 'Calculation cancelled after object created!'
+         return
+      endif
+
+c     ecriture dans fichiers du epsilon
+      if (trope.eq.'iso') then
+         do i=1,ndipole
+            k=tabdip(i)
+            if (k.ne.0) then
+               write(66,*) dreal(epsilon(k,2,2)),dimag(epsilon(k,2,2))
+            else
+               write(66,*) 1.d0 , 0.d0
+            endif
+         enddo
+      else
+         do i=1,ndipole
+            k=tabdip(i)
+            if (k.ne.0) then
+               do ii=1,3
+                  do jj=1,3
+                     write(66,*) dreal(epsilon(k,ii,jj)),dimag(epsilon(k
+     $                    ,ii,jj))
+                  enddo
+               enddo
+            else
+               do ii=1,3
+                  do jj=1,3
+                     write(66,*) 1.d0 , 0.d0
+                  enddo
+               enddo
+            endif
+         enddo          
+      endif
+c     fin ecriture du epsilon
+c     epsilon
+      close(66)
+
+      
+      lambda10n = lambda/10.d0/cdabs(cdsqrt(eps))
+      if (aretecube.ge.2.5d0*lambda10n) then
+         nstop=1
+         infostr='meshsize larger than lambda/4!'
+         return
+      endif
+      write(*,*) 'Number of subunit for the object:',nbsphere
+      write(*,*) 'Number of subunit for the mesh  :',ndipole
+      write(*,*) 'Size of the mesh size           :',aretecube
+      write(*,*) 'number of subunit along x y and z',nx,ny,nz
+      write(99,*) 'number of subunit for the object',nbsphere
+      write(99,*) 'number of subunit for the mesh ',ndipole
+      write(99,*) 'number of subunit along x y and z',nx,ny,nz
+      write(99,*) 'mesh size',aretecube
+      write(99,*) 'lambda/(10n)',lambda/10.d0/cdabs(cdsqrt(eps))
+
+
+      if (beam(1:11).eq.'pwavelinear') then
+         write(99,*) 'Beam pwavelinear'
+      elseif (beam(1:13).eq.'pwavecircular') then
+         write(99,*) 'Beam pwavecircular'
+      elseif (beam(1:7).eq.'antenna') then
+         write(99,*) 'Beam antenna'
+      elseif (beam(1:11).eq.'gwavelinear') then
+         write(99,*) 'Beam gwavelinear'
+      elseif (beam(1:13).eq.'gwavecircular') then
+         write(99,*) 'Beam gwavecircular'
+      elseif (beam(1:15).eq.'gparawavelinear') then
+         write(99,*) 'Beam gparawavelinear'
+      elseif (beam(1:17).eq.'gparawavecircular') then
+         write(99,*) 'Beam gparawavecircular'
+      elseif (beam(1:9).eq.'arbitrary') then
+         write(99,*) 'Beam arbitrary'
+      else
+         write(99,*) 'Beam unknown'
+         infostr='Beam unknown!'
+         nstop=1
+         return
+      endif
+
+c     cré le fichier de data pour connaitre les options pour matlab
+      open(900,file='inputmatlab.mat')
+      write(900,*) nproche
+      write(900,*) nlocal
+      write(900,*) nmacro
+      write(900,*) nsection
+      write(900,*) nsectionsca    
+      write(900,*) nquickdiffracte
+      write(900,*) nforce
+      write(900,*) nforced
+      write(900,*) ntorque
+      write(900,*) ntorqued
+      write(900,*) nlentille
+      write(900,*) nquicklens
+      write(900,*) nphi
+      write(900,*) ntheta+1
+      if (trope.eq.'iso') write(900,*) 0
+      if (trope.eq.'ani') write(900,*) 1
+      write(900,*) nfft2d
+      write(900,*) k0
+      write(900,*) numaper
+      write(900,*) nprochefft
+      write(900,*) nobjet
+      close(900)
+
+
+c     ne fait que l'objet
+      if (nobjet.eq.1) then 
+         infostr='Dipole calculation completed!'
+         return
+      endif
+
+      
+c     multiplication by a factor 2: Toeplitz matrix transformed in a
+c     circulant matrix with a doble size.
+      nbsphere3=3*nbsphere
+      nx2=2*nx
+      ny2=2*ny
+      nz2=2*nz
+      nxy2=nx2*ny2
+      ntotal=8*nx*ny*nz      
+      
+c     if the computation asked is rigourous then compute the Green
+c     function
+      if (nrig.eq.0) then
+         x0=0.d0
+         y0=0.d0
+         z0=0.d0
+         write(*,*) 'Begin the computation of the Green function'
+c     Compute the Green fonction in free space
+         do kk=1,nz2
+            do jj=1,ny2
+               do ii=1,nx2
+                  indice=ii+nx2*(jj-1)+nxy2*(kk-1)
+                  if (ii.eq.nx+1.or.jj.eq.ny+1.or.kk.eq.nz+1) then
+                     FFTTENSORxx(indice)=0.d0
+                     FFTTENSORxy(indice)=0.d0
+                     FFTTENSORxz(indice)=0.d0
+                     FFTTENSORyy(indice)=0.d0
+                     FFTTENSORyz(indice)=0.d0
+                     FFTTENSORzz(indice)=0.d0
+                  else
+                     if (ii.gt.nx) then
+                        i=(ii-1)-nx2
+                     else
+                        i=ii-1
+                     endif
+                     if (jj.gt.ny) then
+                        j=(jj-1)-ny2
+                     else
+                        j=jj-1
+                     endif
+                     if (kk.gt.nz) then
+                        k=(kk-1)-nz2
+                     else
+                        k=kk-1
+                     endif
+                     xx0=dble(i)*aretecube
+                     yy0=dble(j)*aretecube
+                     zz0=dble(k)*aretecube
+                     
+                     
+
+c     integration de l'espace libre
+                     write(*,*) 'coucou'
+                     if (nquad.ne.0.and.i*i+j*j+k*k.le.nquad*nquad) then
+                        RELREQ=tolinit
+                        lim=1.d0
+                        write(*,*) 'coucou0'
+                        call propaespacelibreint(x0,y0,z0,xx0,yy0,zz0
+     $                       ,k0,aretecube,lim,RELREQ,propaesplibre)
+                        write(*,*) 'nquad',i,j,k,nquad
+                     else
+                        call propa_espace_libre(x0,y0,z0,xx0,yy0,zz0,k0
+     $                       ,propaesplibre)
+                     endif
+
+                     FFTTENSORxx(indice)=propaesplibre(1,1)
+                     FFTTENSORxy(indice)=propaesplibre(1,2)
+                     FFTTENSORxz(indice)=propaesplibre(1,3)
+                     FFTTENSORyy(indice)=propaesplibre(2,2)
+                     FFTTENSORyz(indice)=propaesplibre(2,3)
+                     FFTTENSORzz(indice)=propaesplibre(3,3)
+                  endif
+               enddo
+            enddo
+         enddo
+         write(*,*) 'End computation of the Green function'
+c     compute the FFT of the Green function
+!     $OMP PARALLEL
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT3D(FFTTENSORxx,nx2,ny2,nz2,1)
+!     $OMP SECTION         
+         CALL ZFFT3D(FFTTENSORxy,nx2,ny2,nz2,1)
+!     $OMP SECTION         
+         CALL ZFFT3D(FFTTENSORxz,nx2,ny2,nz2,1)
+!     $OMP SECTION         
+         CALL ZFFT3D(FFTTENSORyy,nx2,ny2,nz2,1)
+!     $OMP SECTION
+         CALL ZFFT3D(FFTTENSORyz,nx2,ny2,nz2,1)
+!     $OMP SECTION         
+         CALL ZFFT3D(FFTTENSORzz,nx2,ny2,nz2,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL
+
+         write(*,*) 'End FFT computation of the Green function'
+c     Compute the incident field at each subunit of the object
+         if (nstop == -1) then
+            infostr = 'Calculation cancelled after FFT Green function!'
+            return
+         endif
+      endif
+      write(*,*) ' '
+      write(*,*) 'Compute the incident field'
+      write(99,*) '******* Compute the incident field *******'
+      write(99,*) 'Beam used',beam
+      write(99,*) 'k0=',k0     
+      if (beam(1:11).eq.'pwavelinear') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol1=',pp
+         write(99,*) 'pol2=',ss
+c     compute E0
+         call irradiance(P0,w0,E0,irra)
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1
+            call ondeplane(xs(i),ys(i),zs(i),k0,E0,ss,pp,theta,phi,
+     $           FF0(3*i-2),FF0(3*i-1),FF0(3*i),nstop,infostr)
+         enddo
+      elseif (beam(1:13).eq.'pwavecircular') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol=',ss
+c     compute E0
+         call irradiance(P0,w0,E0,irra)
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1
+            call ondecirce(xs(i),ys(i),zs(i),k0,E0,ss,theta,phi,
+     $           FF0(3*i-2),FF0(3*i-1),FF0(3*i))         
+         enddo
+      elseif (beam(1:7).eq.'antenna') then
+         E0=dsqrt(3.d0*quatpieps0/(k0**4.d0)*P0)/quatpieps0*uncomp
+         xdip=xgaus*1.d-9
+         ydip=ygaus*1.d-9
+         zdip=zgaus*1.d-9
+         write(*,*) 'coucou',xdip,ydip,zdip,E0
+         call dipoleinside(xdip,ydip,zdip,xs,ys,zs,aretecube,nmax
+     $        ,nbsphere)
+c         write(*,*) 'coucou',xdip,ydip,zdip,theta,phi,E0
+         do i=1,nbsphere
+            call dipoleinc(xdip,ydip,zdip,theta,phi,xs(i),ys(i),zs(i)
+     $           ,aretecube,k0,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i),nstop
+     $           ,infostr)
+         enddo
+c     compute the intenisty at the first object location
+         call dipoleinc(xdip,ydip,zdip,theta,phi,xgmulti(1),ygmulti(1)
+     $        ,zgmulti(1),aretecube,k0,E0,Em(1),Em(2),Em(3),nstop
+     $        ,infostr)
+         I0=cdabs(Em(1))**2.d0+cdabs(Em(2))**2.d0+cdabs(Em(3))**2.d0
+         write(*,*) 'I0',I0
+      elseif (beam(1:11).eq.'gwavelinear') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol1=',pp
+         write(99,*) 'pol2=',ss
+         nloin=0
+         tol=tolinit
+         call gaussianpuissance(P0,irra,w0,k0,E0)
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1            
+            call gaussianchamp(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus,theta
+     $           ,phi,w0,k0,ss,pp,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i),tol
+     $           ,nloin,nstop,infostr)
+            
+c     write(*,*) 'champ',i,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+c     write(*,*) 'champderivee',i,icomp*k0*FF0(3*i-2)
+         enddo
+      elseif (beam(1:13).eq.'gwavecircular') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol=',ss
+         nloin=0
+         tol=tolinit
+         call gaussianpuissance(P0,irra,w0,k0,E0)
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1            
+            call gaussianchampcirc(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
+     $           ,theta,phi,w0,k0,ss,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+     $           ,tol,nloin)
+c     write(*,*) 'totocirc',xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
+c     $           ,theta,phi,w0,k0,ss,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+c     $           ,tol,nloin
+         enddo
+      elseif (beam(1:15).eq.'gparawavelinear') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol1=',pp
+         write(99,*) 'pol2=',ss
+         call gaussianpuissancepara(w0,P0,irra,E0)
+
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1            
+            call gaussianparalinear(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
+     $           ,theta,phi,w0,k0,ss,pp,E0,FF0(3*i-2),FF0(3*i-1),FF0(3
+     $           *i),nstop,infostr)
+         enddo
+      elseif (beam(1:17).eq.'gparawavecircular') then
+         write(99,*) 'theta=',theta
+         write(99,*) 'phi=',phi
+         write(99,*) 'pol=',ss
+         call gaussianpuissancepara(w0,P0,irra,E0)
+         I0=cdabs(E0)**2
+         do i=1,nbsphere
+            subunit= subunit+1            
+            call gaussianparacirc(xs(i),ys(i),zs(i),xgaus,ygaus,zgaus
+     $           ,theta,phi,w0,k0,ss,E0,FF0(3*i-2),FF0(3*i-1),FF0(3*i)
+     $           ,nstop,infostr)           
+         enddo
+      elseif  (beam(1:9).eq.'arbitrary') then
+         call incidentarbitrary(xs,ys,zs,aretecube,FF0,nxm,nym,nzm
+     $        ,nbsphere,nstop,namefileinc,infostr)
+         if (nstop.eq.1) return
+           
+      endif
+
+c     ecriture dans .mat et creation de incidentifeld et composantes.
+      subunit=0
+      do i=1,ndipole
+         k=tabdip(i)
+         if (k.ne.0) then
+            subunit=subunit+1
+            incidentfieldx(subunit)=FF0(3*k-2)
+            incidentfieldy(subunit)=FF0(3*k-1)
+            incidentfieldz(subunit)=FF0(3*k)
+            incidentfield(subunit)=dsqrt(dreal(FF0(3*k-2)*dconjg(FF0(3*k
+     $           -2))+FF0(3*k-1)*dconjg(FF0(3*k-1))+FF0(3*k)
+     $           *dconjg(FF0(3*k))))
+            write(36,*)dreal(incidentfieldx(subunit))
+     $           ,dimag(incidentfieldx(subunit))
+            write(37,*)dreal(incidentfieldy(subunit))
+     $           ,dimag(incidentfieldy(subunit))
+            write(38,*)dreal(incidentfieldz(subunit))
+     $           ,dimag(incidentfieldz(subunit))
+            write(39,*) incidentfield(subunit)
+         else
+c            incidentfieldx(i)=0.d0
+c            incidentfieldy(i)=0.d0
+c            incidentfieldz(i)=0.d0
+c            incidentfield(i)=0.d0
+            write(36,*) 0.d0,0.d0
+            write(37,*) 0.d0,0.d0
+            write(38,*) 0.d0,0.d0
+            write(39,*) 0.d0
+         endif            
+      enddo
+
+      
+      write(99,*) 'Field modulus',cdabs(E0)
+      if (nstop.eq.1) return
+      if (nstop == -1) then
+         infostr = 'Calculation cancelled after incident field!'
+         return
+      endif
+      write(*,*) 'End incident field'
+      if (nlecture.eq.1) then
+         write(*,*) 'reread or create the dipoles'
+         call relecture(lambda,beam,object,trope,nnnr,tolinit, side,
+     $        sidex, sidey, sidez, hauteur, numberobjet, rayonmulti,
+     $        xgmulti, ygmulti, zgmulti, epsmulti, epsanimulti,lc,hc,ng,
+     $        demiaxea ,demiaxeb,demiaxec,thetaobj,phiobj,psiobj,
+     $        namefileobj, theta, phi, pp, ss, P0, w0, xgaus, ygaus,
+     $        zgaus ,namefileinc, numberobjetmax,polarizability,nquad
+     $        ,filereread,nlecture1,nstop ,infostr)
+         write(*,*) 'reread',nlecture1,nstop,infostr
+         if (nstop.eq.1) return
+c     reread the local field         
+         if (nlecture1.eq.1) then
+            write(*,*) 'reread the dipoles'
+            file1='.lf'
+            long = len( trim(filereread  ) )
+            long1 = len( trim( file1 ) )
+            filereread1=filereread(1:long)//file1(1:long1)
+            open(1000,file=filereread1,status='old',iostat=ierror,form
+     $           ='unformatted')
+            if (ierror.ne.0) then
+               nstop=1
+               infostr='file for read local field do not exist!'
+               return
+            else
+               do i=1,nbsphere3
+                  read(1000) FF(i),FFloc(i)
+               enddo
+            endif
+            close(1000)
+            goto 1000
+         endif
+      endif
+      write(*,*) ' '
+      call cpu_time(t1)
+      call date_and_time(date,time,zone,values)
+      
+      if (nrig.eq.0) then
+         write(*,*) '***** Solve the linear system *****'
+         write(99,*) '***** Solve the linear system *****'
+c     Compute the local field at each subunit position by solving Ax=b
+c     as an initial guess the incident field
+c     initilization for solve Ax=b
+         tol=tolinit
+         ncompte=0
+         nou=0
+         ndim=nbsphere3
+         nloop=0
+         nlim=10000 
+!     $OMP PARALLEL 
+!     $OMP DO  
+         do i=1,nbsphere3
+            xi(i)=FF0(i)
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+
+         if (methodeit(1:7).eq.'GPBICG1') then
+ 2002       call GPBICG(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim,TOL
+     $           ,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR)      
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL 
+!     $OMP DO                
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL            
+            if (nstat.eq.1) then
+!     $OMP PARALLEL 
+!     $OMP DO                
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+                  write(999,*) FFloc(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                   
+            endif
+!     $OMP PARALLEL 
+!     $OMP DO
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo        
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2002
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+            tol1=dsqrt(tol1)/NORM
+c     as we begin with ITNO=-1
+            nloop=nloop+1
+c            write(*,*) 'GPBICG1 tol1',tol1,tmp/NORM
+            
+            
+         elseif (methodeit(1:7).eq.'GPBICG2') then
+ 2009       call GPBICG2(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim
+     $           ,TOL,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR) 
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL 
+!     $OMP DO            
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL              
+            if (nstat.eq.1) then
+!     $OMP PARALLEL 
+!     $OMP DO                     
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                
+            endif
+!     $OMP PARALLEL 
+!     $OMP DO            
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo      
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2009
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+            nloop=nloop+1
+c            write(*,*) 'GPBICG2 tol1',tol1,tmp/NORM
+            
+         elseif (methodeit(1:10).eq.'GPBICGsafe') then
+ 2019       call GPBICGsafe(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim
+     $           ,TOL,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR) 
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL 
+!     $OMP DO                
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL             
+            if (nstat.eq.1) then
+!     $OMP PARALLEL 
+!     $OMP DO                
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+            endif
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo  
+!     $OMP ENDDO 
+!     $OMP END PARALLEL  
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2019
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+            nloop=nloop+1
+c            write(*,*) 'GPBICGsafe tol1',tol1,tmp/NORM
+         elseif (methodeit(1:8).eq.'GPBICGAR') then
+ 2010       call GPBICGAR(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim
+     $           ,TOL,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR) 
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL              
+            if (nstat.eq.1) then
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                
+            endif
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo  
+!     $OMP ENDDO 
+!     $OMP END PARALLEL              
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+            
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2010
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+            nloop=nloop+1
+c            write(*,*) 'GPBICGAR1 tol1',tol1,tmp/NORM
+            
+         elseif (methodeit(1:9).eq.'GPBICGAR2') then
+ 2011       call GPBICGAR2(XI,XR,FF0,ldabi,ndim,nlar,nou,WRK,NLOOP,Nlim
+     $           ,TOL,NORM,ALPHA,BETA,GPETA,DZETA,R0RN,NSTAT,STEPERR) 
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+            if (nstat.eq.1) then
+!     $OMP PARALLEL               
+!     $OMP DO 
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                
+            endif
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo 
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+            
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2011
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+            nloop=nloop+1
+c            write(*,*) 'GPBICGAR2 tol1',tol1,tmp/NORM
+            
+         elseif (methodeit(1:3).eq.'QMRCLA') then
+
+ 2003       call PIMZQMR(FFloc,XI,XR,FF0,WRK,NORM,LDABI,NDIM,NLAR,QMR1
+     $           ,QMR2,QMR3,QMR4,QMR5,QMR6,QMR7,QMR8,QMR9,DOTS,NOU,NT
+     $           ,nloop,NLIM,TOLE ,TOL ,NSTAT ,STEPERR)
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            ncompte=ncompte+1
+            if (nstat.eq.1) then
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xi(i)=FFloc(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLE              
+               nt=1
+            endif
+c     write(*,*) 'ncompte',ncompte,nt,tole
+            if (nt.eq.1) then
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xr(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere
+                  k=3*(i-1)
+                  xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k
+     $                 +2)+polarisa(i,1,3)*xr(k+3)
+                  xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k
+     $                 +2)+polarisa(i,2,3)*xr(k+3)
+                  xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k
+     $                 +2)+polarisa(i,3,3)*xr(k+3)
+               enddo   
+!     $OMP ENDDO 
+!     $OMP END PARALLEL  
+               call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy
+     $              ,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz
+     $              ,vectx,vecty,vectz,Tabdip,ntotalm,ntotal,nmax
+     $              ,ndipole,nxm ,nym,nzm,nx,ny,nz,nx2,ny2,nxy2,nz2,XI
+     $              ,XR)
+
+            elseif (nt.eq.2) then
+c     calcul avec le transpose
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xr(i)=0.d0
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+               call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy
+     $              ,FFTTENSORxz,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz
+     $              ,vectx,vecty,vectz,Tabdip,ntotalm,ntotal,nmax
+     $              ,ndipole,nxm ,nym,nzm,nx,ny,nz,nx2,ny2,nxy2,nz2,XI
+     $              ,XR)
+               
+c     xr=-At*xi car A=At
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere
+                  k=3*(i-1)
+                  do ii=1,3
+                     wrk(k+ii,12)=0.d0
+                     do jj=1,3
+                        wrk(k+ii,12)=wrk(k+ii,12)+polarisa(i,jj,ii)*xr(k
+     $                       +jj)
+                     enddo
+                     xr(k+ii)=wrk(k+ii,12)+xi(k+ii)
+                  enddo               
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                    
+            endif
+
+            if (nstat.ne.1) goto  2003
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+
+c            write(*,*) 'QMR tol1',tol1
+            
+         elseif (methodeit(1:5).eq.'TFQMR') then
+ 2004       call TFQMR(FFloc,Xi,XR,FF0,ldabi,ndim,nlar,nou,WRK,nloop
+     $           ,NLIM,TOL,NORM,QMR1,QMR2,QMR3,QMR4,QMR5,QMR6,NSTAT
+     $           ,STEPERR)
+
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.eq.1) then
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xi(i)=FFloc(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+            endif
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL              
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+
+
+            if (nstat.ne.1) goto  2004
+            
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+            tol1=dsqrt(tol1)/NORM
+            nloop=nloop+1
+c            write(*,*) 'TFQMR tol1',tol1,NORM,xr(1),FF(1),FF0(1)
+            
+         elseif (methodeit(1:5).eq.'CG') then
+
+ 2005       call ZCG(XI,XR,FF0,NORM,WRK,QMR1,QMR2,QMR3,LDABI,NDIM,NLAR
+     $           ,NOU,NSTAT,NLOOP,NLIM,TOLE,TOL)
+
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+            if (nstat.eq.1) then
+!     $OMP PARALLEL       
+!     $OMP DO 
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+               write(*,*) 'xi',xi
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+            endif
+!     $OMP PARALLEL               
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+              write(*,*) 'xr',xr
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL       
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo
+            write(*,*) 'xi2',xi
+!     $OMP ENDDO 
+!     $OMP END PARALLEL           
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+
+            if (nstat.ne.1) goto  2005
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+
+c            write(*,*) 'ZCG tol1',tol1
+            
+         elseif (methodeit(1:8).eq.'BICGSTAB') then
+
+ 2006       call PIMZBICGSTAB(FFLOC,Xi,XR,FF0,ldabi,nlar,ndim,nou,WRK
+     $           ,QMR1,QMR2,QMR3,NORM,TOL,nloop,nlim,NSTAT,STEPERR)
+
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+            if (nstat.eq.1) then
+!     $OMP PARALLEL
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xi(i)=FFLOC(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL               
+            endif
+!     $OMP DO 
+!     $OMP END PARALLEL  
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL 
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo 
+!     $OMP ENDDO 
+!     $OMP END PARALLEL             
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
+     $           ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+
+            if (nstat.ne.1) goto  2006
+
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+            
+c            write(*,*) 'PIMZBICGSTAB tol1',tol1
+            
+         elseif (methodeit(1:12).eq.'QMRBICGSTAB1') then
+            nt=1
+ 2007       call QMRBICGSTAB(FFloc,Xi,XR,FF0,ldabi,ndim,nlar,nou,WRK
+     $           ,nloop,nloop,TOL,TOLE,NORM,QMR1,QMR2,QMR3,QMR4,QMR5
+     $           ,QMR6,QMR7,QMR8,QMR9,NT,NSTAT ,STEPERR)
+
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+
+            if (nstat.eq.1) then
+!     $OMP PARALLEL            
+!     $OMP DO 
+               do i=1,nbsphere3
+                  xi(i)=FFLOC(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL              
+            endif
+!     $OMP PARALLEL 
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL 
+!     $OMP DO 
+           do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo  
+!     $OMP ENDDO 
+!     $OMP END PARALLEL            
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
+     $           ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+            if (nstat.ne.1) goto  2007
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+
+c            write(*,*) 'QMRBICGSTAB1 tol1',tol1
+            
+         elseif (methodeit(1:12).eq.'QMRBICGSTAB2') then
+
+            nt=2
+ 2008       call QMRBICGSTAB(FFloc,Xi,XR,FF0,ldabi,ndim,nlar,nou,WRK
+     $           ,nloop,nloop,TOL,TOLE,NORM,QMR1,QMR2,QMR3,QMR4,QMR5
+     $           ,QMR6,QMR7,QMR8,QMR9,NT,NSTAT ,STEPERR)
+            
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+            if (nstat.eq.1) then
+!     $OMP PARALLEL 
+!     $OMP DO                
+               do i=1,nbsphere3
+                  xi(i)=FFLOC(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                  
+            endif
+!     $OMP PARALLEL 
+!     $OMP DO 
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+!     $OMP PARALLEL    
+!     $OMP DO 
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo 
+!     $OMP ENDDO 
+!     $OMP END PARALLEL             
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy ,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz ,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole ,nxm ,nym,nzm,nx
+     $           ,ny,nz,nx2,ny2,nxy2,nz2,XI ,XR)
+
+            if (nstat.ne.1) goto  2008
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+            tol1=dsqrt(tol1)/NORM
+
+c            write(*,*) 'QMRBICGSTAB2 tol1',tol1
+            elseif (methodeit(1:7).eq.'GPBICOR') then
+ 2013          call GPBICOR(XI,XR,FF0,FFloc,ldabi,ndim,nlar,nou,WRK
+     $              ,NLOOP,Nlim,TOL,NORM,ALPHA,BETA,GPETA,DZETA,QMR1
+     $              ,QMR2,NSTAT,STEPERR)
+            if (nstat.lt.0) then
+               nstop=1
+               infostr='Problem to solve Ax=b!'
+               write(*,*) 'Problem to solve Ax=b',nstat,STEPERR
+               return
+            endif
+            ncompte=ncompte+1
+!     $OMP PARALLEL 
+!     $OMP DO                
+            do i=1,nbsphere3
+               xr(i)=xi(i)
+            enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL            
+            if (nstat.eq.1) then
+!     $OMP PARALLEL 
+!     $OMP DO                
+               do i=1,nbsphere3
+                  FFloc(i)=xi(i)
+               enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                   
+            endif
+!     $OMP PARALLEL 
+!     $OMP DO
+            do i=1,nbsphere
+               k=3*(i-1)
+               xi(k+1)=polarisa(i,1,1)*xr(k+1)+polarisa(i,1,2)*xr(k+2)
+     $              +polarisa(i,1,3)*xr(k+3)
+               xi(k+2)=polarisa(i,2,1)*xr(k+1)+polarisa(i,2,2)*xr(k+2)
+     $              +polarisa(i,2,3)*xr(k+3)
+               xi(k+3)=polarisa(i,3,1)*xr(k+1)+polarisa(i,3,2)*xr(k+2)
+     $              +polarisa(i,3,3)*xr(k+3)
+            enddo        
+!     $OMP ENDDO 
+!     $OMP END PARALLEL  
+            call produitfftmatvect3(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $           ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $           ,Tabdip,ntotalm,ntotal,nmax ,ndipole,nxm ,nym,nzm,nx,ny
+     $           ,nz,nx2,ny2,nxy2,nz2,XI,XR)
+
+            if (nstop == -1) then
+               infostr = 'Calculation cancelled during iterative method'
+               return
+            endif
+
+            if (nstat.ne.1) goto  2013
+c     compute the Residue
+            tol1=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:tol1)           
+            do i=1,nbsphere3
+               xr(i)=xr(i)-FF0(i)
+               FF(i)=xi(i)
+               tol1=tol1+dreal(xr(i)*dconjg(xr(i)))
+            enddo            
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+            tol1=dsqrt(tol1)/NORM
+
+c            write(*,*) 'GPBICOR tol1',tol1
+            
+         else
+            write(99,*) 'Iterative method not correct',methodeit
+            write(*,*) 'Iterative method not correct',methodeit
+            nstop=1
+            infostr='Iterative method not correct!'
+            return         
+         endif
+         
+         if (nlecture.eq.1.and.nlecture1.eq.0) then
+            file1='.lf'
+            long = len( trim(filereread  ) )
+            long1 = len( trim( file1 ) )
+            filereread1=filereread(1:long)//file1(1:long1)
+            open(1000,file=filereread1,status='new',form='unformatted')
+            do i=1,nbsphere3
+               write(1000) FF(i),FFloc(i)
+            enddo
+            close(1000)
+         endif
+
+         write(99,*) 'methode iterative used',methodeit
+         write(99,*) 'Tolerance asked for the iterative method',tolinit
+         write(99,*) 'Tolerance obtained for the iterative method',tol1
+         write(99,*) 'Number of product Ax for the iterative method'
+     $        ,ncompte,nloop
+
+         if (tol1.ge.tolinit) then
+            nstop=1
+            infostr='Converge do not reach!'
+            write(*,*) 'Converge do not reach!',tol1,'Tol Asked',tolinit
+            write(99,*) tol1,tolinit
+            return
+         endif
+
+         if (nstop == -1) then
+            infostr = 'Calculation cancelled after iterative method!'
+            return
+         endif
+
+         
+      elseif (nrig.eq.1) then
+c     Born approximation field
+!     $OMP PARALLEL    
+!     $OMP DO 
+         do i=1,nbsphere3
+            FFloc(i)=FF0(i)
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+c     dipole
+!     $OMP PARALLEL     
+!     $OMP DO 
+         do i=1,nbsphere
+            k=3*(i-1)
+            do ii=1,3
+               FF(k+ii)=0.d0
+               do jj=1,3
+                  FF(k+ii)=FF(k+ii)+polarisa(i,ii,jj)*FFloc(k+jj)
+               enddo
+            enddo
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL          
+      endif
+      call cpu_time(t2)
+      call date_and_time(date,time,zone,values2)
+      write(*,*) 'CPU time to solve Ax=b in second  : ',t2-t1
+      write(*,*) 'Real time to solve Ax=b in second : ',(values2(5)
+     $     -values(5))*3600.d0+(values2(6)-values(6))*60.d0+(values2(7)
+     $     -values(7))+(values2(8)-values(8))/1000.d0
+
+      write(*,*) 'Method iterative used        : ',methodeit
+      write(*,*) 'Tolerance obtained           : ',tol1
+      write(*,*) 'Tolerance asked              : ',tolinit
+      write(*,*) 'Number of product Ax needs   : ',ncompte
+      write(*,*) '**** End to solve the linear system ****'
+      write(*,*) ' '
+c     compute the near field with FFT
+ 1000 if (nprochefft.ge.1) then
+c     compute the FFT in all the box
+         write(*,*) 'Compute Near field'
+
+         call factor235(nxm,IP,test)        
+         if (test.eq.1) then
+            infostr='nxm problem!'
+            nstop=1
+            return
+         endif
+         call factor235(nym,IP,test)        
+         if (test.eq.1) then
+            infostr='nym problem!'
+            nstop=1
+            return
+         endif
+         call factor235(nzm,IP,test)        
+         if (test.eq.1) then
+            infostr='nzm problem!'
+            nstop=1
+            return
+         endif
+
+         
+         x0=0.d0
+         y0=0.d0
+         z0=0.d0      
+         nxm2=2*nxm
+         nym2=2*nym
+         nzm2=2*nzm
+         nxym2=nxm2*nym2
+c     Compute the Green fonction in free space
+         do kk=1,nzm2
+            do jj=1,nym2
+               do ii=1,nxm2
+                  indice=ii+nxm2*(jj-1)+nxym2*(kk-1)
+                  if (ii.eq.nxm+1.or.jj.eq.nym+1.or.kk.eq.nzm+1) then
+                     FFTTENSORxx(indice)=0.d0
+                     FFTTENSORxy(indice)=0.d0
+                     FFTTENSORxz(indice)=0.d0
+                     FFTTENSORyy(indice)=0.d0
+                     FFTTENSORyz(indice)=0.d0
+                     FFTTENSORzz(indice)=0.d0
+                  else
+                     if (ii.gt.nxm) then
+                        i=(ii-1)-nxm2
+                     else
+                        i=ii-1
+                     endif
+                     if (jj.gt.nym) then
+                        j=(jj-1)-nym2
+                     else
+                        j=jj-1
+                     endif
+                     if (kk.gt.nz) then
+                        k=(kk-1)-nzm2
+                     else
+                        k=kk-1
+                     endif
+                     xx0=dble(i)*aretecube
+                     yy0=dble(j)*aretecube
+                     zz0=dble(k)*aretecube
+
+
+c     integration de l'espace libre
+                     if (nquad.ne.0.and.i*i+j*j+k*k.le.nquad*nquad) then
+                        RELREQ=tolinit
+                        lim=1.d0
+                        call propaespacelibreint(x0,y0,z0,xx0,yy0,zz0
+     $                       ,k0,aretecube,lim,RELREQ,propaesplibre)
+c     write(*,*) 'nquad',i,j,k,nquad
+                     else
+                        call propa_espace_libre(x0,y0,z0,xx0,yy0,zz0,k0
+     $                       ,propaesplibre)
+                     endif                     
+
+                     FFTTENSORxx(indice)=propaesplibre(1,1)
+                     FFTTENSORxy(indice)=propaesplibre(1,2)
+                     FFTTENSORxz(indice)=propaesplibre(1,3)
+                     FFTTENSORyy(indice)=propaesplibre(2,2)
+                     FFTTENSORyz(indice)=propaesplibre(2,3)
+                     FFTTENSORzz(indice)=propaesplibre(3,3)
+                  endif
+               enddo
+            enddo
+         enddo
+
+c     compute the FFT of the Green function
+!     $OMP PARALLEL 
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT3D(FFTTENSORxx,nxm2,nym2,nzm2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(FFTTENSORxy,nxm2,nym2,nzm2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(FFTTENSORxz,nxm2,nym2,nzm2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(FFTTENSORyy,nxm2,nym2,nzm2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(FFTTENSORyz,nxm2,nym2,nzm2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(FFTTENSORzz,nxm2,nym2,nzm2,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL
+         
+c     compte the size and edge of the box
+         xmax=-1.d300
+         xmin=1.d300
+         ymax=-1.d300
+         ymin=1.d300
+         zmax=-1.d300
+         zmin=1.d300      
+         
+         do i=1,nbsphere
+            xmax=max(xmax,xs(i))
+            xmin=min(xmin,xs(i))
+            ymax=max(ymax,ys(i))
+            ymin=min(ymin,ys(i))
+            zmax=max(zmax,zs(i))
+            zmin=min(zmin,zs(i))
+         enddo
+         write(*,*) 'Size of the box for the near field'
+         write(*,*) 'xmin and xmax =',xmin,xmax
+         write(*,*) 'ymin and ymax =',ymin,ymax
+         write(*,*) 'zmin and zmax =',zmin,zmax
+         write(*,*) 'meshsize = ',aretecube
+c     compute new position of computation, dipole and incident field at
+c     the new grid
+         write(*,*) 'Discretization of the box for the near field'
+         write(*,*) 'nx =',nx
+         write(*,*) 'ny =',ny
+         write(*,*) 'nz =',nz
+         kkm=(nxm-nx)/2
+         jjm=(nym-ny)/2
+         iim=(nzm-nz)/2
+         xi=0.d0
+         xr=0.d0
+         l=1
+         subunit=0
+c     initialize and reuse polarisa : pola= background
+         polarisa=0.d0
+!     $OMP PARALLEL    
+!     $OMP DO 
+         do i=1,nmax
+            polarisa(i,1,1)=1.d0
+            polarisa(i,2,2)=1.d0
+            polarisa(i,3,3)=1.d0
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL  
+         cntwf = 0
+         do i=1,nzm
+            do j=1,nym
+               do k=1,nxm
+                  cntwf = cntwf + 1
+                  x=xmin+dble(k-kkm-1)*aretecube
+                  y=ymin+dble(j-jjm-1)*aretecube
+                  z=zmin+dble(i-iim-1)*aretecube
+                  zswf(cntwf) = z
+                  yswf(cntwf) = y
+                  xswf(cntwf) = x
+
+                  if (j.eq.1.and.k.eq.1)  write(69,*) z
+                  if (i.eq.1.and.k.eq.1)  write(68,*) y
+                  if (j.eq.1.and.i.eq.1)  write(67,*) x
+                 
+                 
+c     if (j.eq.1.and.k.eq.1) then
+c     write(69,*) z
+c     endif
+c     if (i.eq.1.and.k.eq.1) then
+c     write(68,*) y
+c     endif
+c     if (j.eq.1.and.i.eq.1) then
+c     write(67,*) x
+c     endif
+                  subunit=subunit+1              
+                  nsubunit=3*(subunit-1)
+c     write(*,*) 'coucou', x,y,z,xs(l),ys(l),zs(l),l
+c     $                 ,comparaison(x,y,z,xs(l),ys(l),zs(l),lambda)
+                  if (comparaison(x,y,z,xs(l),ys(l),zs(l)
+     $                 ,lambda).eq.1.and.l.le.nbsphere)  then
+                     ll=3*(l-1)        
+c     signe - pour compenser le signe moins dans la routibe AX: E=E0-(-Ap)
+                     xi(nsubunit+1)=-FF(ll+1)
+                     xi(nsubunit+2)=-FF(ll+2)
+                     xi(nsubunit+3)=-FF(ll+3)
+                     xr(nsubunit+1)=FF0(ll+1)
+                     xr(nsubunit+2)=FF0(ll+2)
+                     xr(nsubunit+3)=FF0(ll+3)
+                     do ii=1,3
+                        do jj=1,3
+                           polarisa(subunit,ii,jj)=epsilon(l,ii,jj)
+                        enddo
+                     enddo
+                     l=l+1
+                  else
+c     comptute the incident field not computed yet
+                     if (beam(1:11).eq.'pwavelinear') then
+                        call ondeplane(x,y,z,k0,E0,ss,pp,theta,phi
+     $                       ,xr(nsubunit+1),xr(nsubunit+2),xr(nsubunit
+     $                       +3),nstop,infostr)
+                     elseif (beam(1:13).eq.'pwavecircular') then
+                        call ondecirce(x,y,z,k0,E0,ss,theta,phi
+     $                       ,xr(nsubunit+1),xr(nsubunit+2),xr(nsubunit
+     $                       +3))
+                     elseif (beam(1:7).eq.'antenna') then
+                        call dipoleinc(xdip,ydip,zdip,theta,phi,x ,y,z
+     $                       ,aretecube,k0,E0,xr(nsubunit+1),xr(nsubunit
+     $                       +2),xr(nsubunit +3),nstop,infostr)
+                     elseif (beam(1:11).eq.'gwavelinear') then
+                        call gaussianchamp(x,y,z,xgaus,ygaus,zgaus,theta
+     $                       ,phi,w0,k0,ss,pp,E0,xr(nsubunit+1)
+     $                       ,xr(nsubunit+2),xr(nsubunit+3),tol,nloin
+     $                       ,nstop,infostr)
+                     elseif (beam(1:13).eq.'gwavecircular') then
+                        call gaussianchampcirc(x,y,z,xgaus,ygaus,zgaus
+     $                       ,theta,phi,w0,k0,ss,E0,xr(nsubunit+1)
+     $                       ,xr(nsubunit+2),xr(nsubunit+3),tol,nloin)
+                     elseif (beam(1:15).eq.'gparawavelinear') then
+                        call gaussianparalinear(x,y,z,xgaus,ygaus,zgaus
+     $                       ,theta,phi,w0,k0,ss,pp,E0,xr(nsubunit+1)
+     $                       ,xr(nsubunit+2),xr(nsubunit+3),nstop
+     $                       ,infostr)
+                     elseif (beam(1:17).eq.'gparawavecircular') then
+                        call gaussianparacirc(x,y,z,xgaus,ygaus,zgaus
+     $                       ,theta,phi,w0,k0,ss,E0,xr(nsubunit+1)
+     $                       ,xr(nsubunit+2),xr(nsubunit+3),nstop
+     $                       ,infostr)
+                     elseif (beam(1:13).eq.'arbitrary') then
+                        call incidentarbitrarypos(x,y,z,aretecube
+     $                       ,xr(nsubunit+1),xr(nsubunit+2),xr(nsubunit
+     $                       +3),nstop,namefileinc,infostr)
+                     endif
+                  endif
+               enddo
+            enddo
+         enddo
+
+c     save the incident field for wide field
+         do i=1,subunit
+            incidentfieldx(i) = xr(3*i-2)
+            incidentfieldy(i) = xr(3*i-1)
+            incidentfieldz(i) = xr(3*i)
+            incidentfield(i) = dsqrt(dreal(xr(3*i-2)*dconjg(xr(3*i-2))
+     $           +xr(3*i-1)*dconjg(xr(3*i-1))+xr(3*i)*dconjg(xr(3*i))))
+            write(136,*) dreal(xr(3*i-2)),dimag(xr(3*i-2))
+            write(137,*) dreal(xr(3*i-1)),dimag(xr(3*i-1))
+            write(138,*) dreal(xr(3*i)),dimag(xr(3*i))     
+            write(139,*) incidentfield(i)
+         enddo
+c     calcul du champ la position local par le produit matrice vecteur
+c     FFT:
+
+         call produitfftmatvectopt(FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $        ,ntotalm,ntotalm,nmax,nxm,nym,nzm,nxm,nym,nzm,nxm2,nym2
+     $        ,nxym2,nzm2,xi,xr)
+         write(*,*) 'nlocal',nlocal,subunit,xr(1),xr(2),xr(3)
+         if (nlocal.eq.1) then
+            do i=1,subunit
+               ii=3*(i-1)
+               localfieldx(i) = xr(ii+1)
+               localfieldy(i) = xr(ii+2)
+               localfieldz(i) = xr(ii+3)
+               localfield(i) = dsqrt(dreal(xr(ii+1)*dconjg(xr(ii+1))
+     $              +xr(ii+2)*dconjg(xr(ii+2))+xr(ii+3)*dconjg(xr(ii
+     $              +3))))
+               write(140,*) dreal(xr(ii+1)),dimag(xr(ii+1))
+               write(141,*) dreal(xr(ii+2)),dimag(xr(ii+2))
+               write(142,*) dreal(xr(ii+3)),dimag(xr(ii+3))
+               write(143,*) localfield(i)
+            enddo
+         endif
+         write(*,*) 'nlocal',nmacro,subunit
+         if (nmacro.eq.1) then
+            nsens=1
+            do i=1,subunit              
+               ii=3*(i-1)
+               Eloc(1)= xr(ii+1)
+               Eloc(2)= xr(ii+2)
+               Eloc(3)= xr(ii+3)
+c     pour l'instant faut au niveau du epsilonpour le champ macro
+               do ii=1,3
+                  do jj=1,3
+                     epsani(ii,jj)=polarisa(i,ii,jj)
+                  enddo
+               enddo 
+               call local_macro(Eloc,Em,epsani,aretecube,k0,nsens)
+               macroscopicfieldx(i) = Em(1)
+               macroscopicfieldy(i) = Em(2)
+               macroscopicfieldz(i) = Em(3)
+               macroscopicfield(i) = dsqrt(dreal(Em(1)*dconjg(Em(1))
+     $              +Em(2)*dconjg(Em(2))+Em(3)*dconjg(Em(3))))
+               write(144,*) dreal(Em(1)),dimag(Em(1))
+               write(145,*) dreal(Em(2)),dimag(Em(2))
+               write(146,*) dreal(Em(3)),dimag(Em(3))             
+               write(147,*) macroscopicfield(i)
+            enddo
+         endif
+         write(*,*) 'End  computation of Near field'
+         write(*,*) ' '
+      else
+c     fin de condition sur le champ proche large
+c     debut calcul du champ local et macro dans juste l'objet      
+         if (nlocal.eq.1) then
+c$$$            do i=1,nbsphere
+c$$$               subunit= subunit+1
+c$$$               ii=3*(i-1)
+c$$$               localfieldx(subunit)=FFloc(ii+1)
+c$$$               localfieldy(subunit)=FFloc(ii+2)
+c$$$               localfieldz(subunit)=FFloc(ii+3)
+c$$$               localfield(subunit) = dsqrt(dreal(FFloc(ii+1)
+c$$$     $              *dconjg(FFloc(ii+1))+FFloc(ii+2)*dconjg(FFloc(ii+2))
+c$$$     $              +FFloc(ii+3)*dconjg(FFloc(ii+3))))
+c$$$               write(40,*) FFloc(ii+1)
+c$$$               write(41,*) FFloc(ii+2)
+c$$$               write(42,*) FFloc(ii+3)               
+c$$$               write(43,*) localfield(subunit)
+c$$$  enddo
+c            subunit=0
+            do i=1,ndipole
+               k=tabdip(i)
+               if (k.ne.0) then
+                  ii=3*(k-1)
+                  localfieldx(k)=FFloc(ii+1)
+                  localfieldy(k)=FFloc(ii+2)
+                  localfieldz(k)=FFloc(ii+3)
+                  localfield(k) = dsqrt(dreal(FFloc(ii+1)
+     $                 *dconjg(FFloc(ii+1))+FFloc(ii+2)*dconjg(FFloc(ii
+     $                 +2))+FFloc(ii+3)*dconjg(FFloc(ii+3))))
+                  write(40,*) dreal(FFloc(ii+1)),dimag(FFloc(ii+1))
+                  write(41,*) dreal(FFloc(ii+2)),dimag(FFloc(ii+2))
+                  write(42,*) dreal(FFloc(ii+3)),dimag(FFloc(ii+3))             
+                  write(43,*) localfield(k)
+               else
+c                  localfieldx(i)=0.d0
+c                  localfieldy(i)=0.d0
+c                  localfieldz(i)=0.d0
+c                  localfield(i)=0.d0
+                  write(40,*) 0.d0,0.d0
+                  write(41,*) 0.d0,0.d0
+                  write(42,*) 0.d0,0.d0
+                  write(43,*) 0.d0
+               endif
+            enddo
+         endif
+c     compute and save the macroscopic field
+  
+         if (nmacro.eq.1) then
+            nsens=1
+c$$$            do i=1,nbsphere
+c$$$               subunit= subunit+1
+c$$$               ii=3*(i-1)
+c$$$               Eloc(1)= FFloc(ii+1)
+c$$$               Eloc(2)= FFloc(ii+2)
+c$$$               Eloc(3)= FFloc(ii+3)
+c$$$               do ii=1,3
+c$$$                  do jj=1,3
+c$$$                     epsani(ii,jj)=epsilon(i,ii,jj)
+c$$$                  enddo
+c$$$               enddo 
+c$$$               
+c$$$               call local_macro(Eloc,Em,epsani,aretecube,k0,nsens)
+c$$$               macroscopicfieldx(subunit)=Em(1)
+c$$$               macroscopicfieldy(subunit)=Em(2)
+c$$$               macroscopicfieldz(subunit)=Em(3)
+c$$$               write(44,*) Em(1)
+c$$$               write(45,*) Em(2)
+c$$$               write(46,*) Em(3)
+c$$$               macroscopicfield(subunit)= dsqrt(dreal(Em(1)
+c$$$     $              *dconjg(Em(1))+Em(2)*dconjg(Em(2))+Em(3)
+c$$$     $              *dconjg(Em(3))))
+c$$$               write(47,*) macroscopicfield(subunit)
+c$$$  enddo
+            do i=1,ndipole
+               k=tabdip(i)
+               if (k.ne.0) then
+                  ii=3*(k-1)
+                  Eloc(1)= FFloc(ii+1)
+                  Eloc(2)= FFloc(ii+2)
+                  Eloc(3)= FFloc(ii+3)
+                  do ii=1,3
+                     do jj=1,3
+                        epsani(ii,jj)=epsilon(k,ii,jj)
+                     enddo
+                  enddo 
+               
+                  call local_macro(Eloc,Em,epsani,aretecube,k0,nsens)
+                  macroscopicfieldx(k)=Em(1)
+                  macroscopicfieldy(k)=Em(2)
+                  macroscopicfieldz(k)=Em(3)
+                  write(44,*) dreal(Em(1)),dimag(Em(1))
+                  write(45,*) dreal(Em(2)),dimag(Em(2))
+                  write(46,*) dreal(Em(3)),dimag(Em(3))
+                  macroscopicfield(k)= dsqrt(dreal(Em(1) *dconjg(Em(1))
+     $                 +Em(2)*dconjg(Em(2))+Em(3) *dconjg(Em(3))))
+                  write(47,*) macroscopicfield(k)
+               else
+c                  macroscopicfieldx(i)=0.d0
+c                  macroscopicfieldy(i)=0.d0
+c                  macroscopicfieldz(i)=0.d0
+c                  macroscopicfield(i)=0.d0
+                  write(44,*) 0.d0,0.d0
+                  write(45,*) 0.d0,0.d0
+                  write(46,*) 0.d0,0.d0
+                  write(47,*) 0.d0
+               endif
+            enddo
+         endif
+      endif
+      
+      if (nsection.eq.1) then
+c     Compute the extinction cross section and absorbing cross section
+         write(*,*) 'Compute cross section'
+         Cext=0.d0   
+         Cabs=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO   REDUCTION(+:Cext,Cabs)               
+         do i=1,nbsphere
+            kk=3*(i-1)
+            Cext=Cext+dimag(dconjg(FF0(kk+1))*FF(kk+1)+dconjg(FF0(kk
+     $           +2))*FF(kk+2)+dconjg(FF0(kk+3))*FF(kk+3))
+            Cabs=Cabs+dimag(FF(kk+1)*dconjg(FFloc(kk+1))+FF(kk+2)
+     $           *dconjg(FFloc(kk+2))+FF(kk+3)*dconjg(FFloc(kk+3)))
+     $           -2.d0/3.d0*k03*dreal(FF(kk+1)*dconjg(FF(kk+1))+FF(kk+2)
+     $           *dconjg(FF(kk+2))+FF(kk+3)*dconjg(FF(kk+3)))
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL         
+         Cext=4.d0*pi*k0*Cext/I0
+         Cabs=4.d0*pi*k0*Cabs/I0
+
+c     compute the scattering cross section
+         Csca=Cext-Cabs
+         write(99,*) 'extinction cross section',Cext
+         write(99,*) 'absorbing cross section ',Cabs
+         write(99,*) 'scattering cross section',Csca
+         if (nstop == -1) then
+            infostr = 'Calculation cancelled after cross section!'
+            return
+         endif
+         write(*,*) 'End cross section'
+         write(*,*) ' '
+      endif
+
+c     compute the scattering cross section by integration in far field
+c     and compute the Poynting vector along the normal in CGS n.P=c/(8
+c     pi) Re(ExH^*)=c/(8 pi)|E|^2
+      
+      if (nsectionsca.eq.1) then
+         write(*,*) 'Compute Csca g and Poynting',ntheta,nphi
+         if (nquickdiffracte.eq.0) then
+c     compute the diffracted field in summing the dipole
+            write(*,*) 'Slow method'
+            if (ntheta.le.10.or.nphi.le.20) then
+               infostr='ntheta and nphi too small!'
+               nstop=1
+               return
+            endif
+
+            deltatheta=pi/dble(ntheta)
+            deltaphi=2.d0*pi/dble(nphi)
+            Cscai=0.d0
+            Poyntinginc=0.d0
+            gasym=0.d0
+            cnt = 0
+
+
+
+            do itheta=0,ntheta
+               thetas=deltatheta*dble(itheta)
+               do iphi=0,nphi-1
+                  cnt = cnt + 1
+                  phis=deltaphi*dble(iphi)
+                  normal(1)=dsin(thetas)*dcos(phis)
+                  normal(2)=dsin(thetas)*dsin(phis)
+                  normal(3)=dcos(thetas)
+                  Emx=0.d0
+                  Emy=0.d0
+                  Emz=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO REDUCTION(+:Emx,Emy,Emz)      
+                  do i=1,nbsphere
+                     kk=3*(i-1)
+                     ctmp=cdexp(-icomp*k0*(normal(1)*xs(i)+normal(2)
+     $                    *ys(i)+normal(3)*zs(i)))
+                     ctmp1=normal(1)*FF(kk+1)+normal(2)*FF(kk+2)
+     $                    +normal(3)*FF(kk+3)
+                     Emx=Emx+ctmp*(FF(kk+1)-ctmp1*normal(1))
+                     Emy=Emy+ctmp*(FF(kk+2)-ctmp1*normal(2))
+                     Emz=Emz+ctmp*(FF(kk+3)-ctmp1*normal(3))
+                  enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                  
+                  Emod=dreal(Emx*dconjg(Emx)+Emy*dconjg(Emy)
+     $                 +Emz*dconjg(Emz))
+                  write(50,*) Emod*k0*k0*c/8/pi*quatpieps0
+                  poyntingfield(cnt) = Emod*k0*k0*c/8/pi*quatpieps0
+                  write(51,*) thetas*180.d0/pi
+                  thetafield(cnt) = thetas*180.d0/pi
+                  write(52,*) phis*180.d0/pi
+                  phifield(cnt) = phis*180.d0/pi
+                  Cscai=Cscai+deltaphi*deltatheta*dsin(thetas)*Emod
+                  gasym=gasym+deltaphi*deltatheta*dsin(thetas)*Emod
+     $                 *(normal(1)*dsin(theta*pi/180.d0)*dcos(phi*pi
+     $                 /180.d0)+normal(2)*dsin(theta*pi/180.d0)*
+     $                 dsin(phi *pi/180.d0)+normal(3)*dcos(theta*pi
+     $                 /180.d0))
+               enddo
+            enddo
+            gasym=gasym/cscai
+            Cscai=Cscai*k03*k0/I0
+            write(99,*) 'scattering cross section with integration'
+     $           ,Cscai
+            write(99,*) 'scattering asymetric parameter',gasym
+         else
+c     compute the diffracted field with FFT
+            write(*,*) 'Diffracted field: Quick method with FFT'
+            call diffractefft2d(nx,ny,nz,nxm,nym,nzm,nfft2d,k0,xs,ys,zs
+     $           ,aretecube,Efourierx,Efouriery,Efourierz,FF,imaxk0
+     $           ,deltakx,deltaky,Ediffkzpos,Ediffkzneg,nstop,infostr)
+            write(*,*) 'End Quick method with FFT'
+            if (nstop.eq.-1) return
+c     put the field in file with the right angles
+            write(*,*) 'Number of point in the numerical aperture'
+     $           ,2*imaxk0+1
+            do i=-imaxk0,imaxk0
+               do j=-imaxk0,imaxk0
+                  kx=dble(i)*deltakx
+                  ky=dble(j)*deltaky
+                  if (j.eq.0) write(55,*) kx
+                  if (i.eq.0) write(56,*) ky
+                  if (k0*k0-kx*kx-ky*ky.gt.0.d0) then 
+                     ii=imaxk0+i+1
+                     jj=imaxk0+j+1
+c$$$  kz=dsqrt(k0*k0-kx*kx-ky*ky)                
+c$$$  thetas=dacos(kz/k0)
+c$$$  phis=datan2(ky,kx)
+                     Emod=cdabs(Ediffkzpos(ii,jj,1))**2
+     $                    +cdabs(Ediffkzpos(ii,jj,2))**2
+     $                    +cdabs(Ediffkzpos(ii,jj,3))**2
+                     write(53,*) Emod*k0*k0*c/8/pi*quatpieps0
+                     Emod=cdabs(Ediffkzneg(ii,jj,1))**2
+     $                    +cdabs(Ediffkzneg(ii,jj,2))**2
+     $                    +cdabs(Ediffkzneg(ii,jj,3))**2
+                     write(54,*) Emod*k0*k0*c/8/pi*quatpieps0
+c$$$  poyntingfield(cnt) = Emod*k0*k0*c/8/pi*quatpieps0
+c$$$  write(51,*) thetas*180.d0/pi
+c$$$  thetafield(cnt) = thetas*180.d0/pi
+c$$$  write(52,*) phis*180.d0/pi
+c$$$  phifield(cnt) = phis*180.d0/pi
+                  else
+                     Emod=0.d0
+                     write(53,*) Emod
+                     write(54,*) Emod
+                  endif
+               enddo
+            enddo
+c$$$  c            do i=-imaxk0,imaxk0
+c$$$  c               do j=-imaxk0,imaxk0
+c$$$  c                  kx=dble(i)*deltakx
+c$$$  c                  ky=dble(j)*deltaky
+c$$$  c                  if (k0*k0-kx*kx-ky*ky.gt.0.d0) then 
+c$$$  c                     ii=imaxk0+i+1
+c$$$  c                     jj=imaxk0+j+1
+c$$$  c                     kz=dsqrt(k0*k0-kx*kx-ky*ky)       
+c$$$  cnt=cnt+1
+c$$$  thetas=dacos(-kz/k0)
+c$$$  phis=datan2(ky,kx)                   
+c$$$  Emod=cdabs(Ediffkzneg(ii,jj,1))**2
+c$$$  $                    +cdabs(Ediffkzneg(ii,jj,2))**2
+c$$$  $                    +cdabs(Ediffkzneg(ii,jj,3))**2
+c$$$  write(50,*) Emod*k0*k0*c/8/pi*quatpieps0
+c$$$  poyntingfield(cnt) = Emod*k0*k0*c/8/pi*quatpieps0
+c$$$  write(51,*) thetas*180.d0/pi
+c$$$  thetafield(cnt) = thetas*180.d0/pi
+c$$$  write(52,*) phis*180.d0/pi
+c$$$  phifield(cnt) = phis*180.d0/pi
+c$$$  
+c$$$  endif
+c$$$  enddo
+c$$$  enddo
+
+            
+            call computegcfft2d(imaxk0,deltakx,deltaky,k0,I0,theta,phi
+     $           ,nfft2d,Ediffkzpos,Ediffkzneg,gasym,Cscai)
+
+            deltatheta=pi/dble(ntheta)
+            deltaphi=2.d0*pi/dble(nphi)
+            cnt = 0
+
+            do itheta=0,ntheta
+               thetas=deltatheta*dble(itheta)
+               do iphi=0,nphi-1
+                  cnt = cnt + 1
+                  phis=deltaphi*dble(iphi)
+
+                  write(51,*) thetas*180.d0/pi
+                  thetafield(cnt) = thetas*180.d0/pi
+                  write(52,*) phis*180.d0/pi
+                  phifield(cnt) = phis*180.d0/pi
+
+                  kx=k0*dsin(thetas)*dcos(phis)
+                  ky=k0*dsin(thetas)*dsin(phis)
+                  i=int(kx/deltakx)
+                  j=int(ky/deltakx)
+                  
+                  ii=imaxk0+i+1
+                  jj=imaxk0+j+1
+
+                  if (kx.ge.0.d0) i2=i+1
+                  if (kx.lt.0.d0) i2=i-1
+                  if (ky.ge.0.d0) j2=j+1
+                  if (ky.lt.0.d0) j2=j-1
+
+                  if ((dble(i2)**2+dble(j2)**2)*deltakx*deltakx.le.k0
+     $                 *k0) then
+                     ii2=imaxk0+i2+1
+                     jj2=imaxk0+j2+1
+                     if (thetas.le.pi/2.d0) then
+                        Emod=(cdabs(Ediffkzpos(ii,jj,1))**2
+     $                       +cdabs(Ediffkzpos(ii,jj,2))**2
+     $                       +cdabs(Ediffkzpos(ii,jj,3))**2)
+     $                       *dabs((dble(i2) *deltakx-kx)*(dble(j2)
+     $                       *deltakx-ky))+ (cdabs(Ediffkzpos(ii2,jj,1))
+     $                       **2 +cdabs(Ediffkzpos(ii2,jj,2))**2
+     $                       +cdabs(Ediffkzpos(ii2,jj,3))**2)*dabs((
+     $                       -dble(i) *deltakx+kx)*(dble(j2)*deltakx
+     $                       -ky))+ (cdabs(Ediffkzpos(ii,jj2,1))**2
+     $                       +cdabs(Ediffkzpos(ii,jj2,2))**2
+     $                       +cdabs(Ediffkzpos(ii,jj2,3))**2)
+     $                       *dabs((dble(i2) *deltakx-kx)*(-dble(j)
+     $                       *deltakx+ky))+ (cdabs(Ediffkzpos(ii2,jj2
+     $                       ,1))**2 +cdabs(Ediffkzpos(ii2,jj2,2))**2
+     $                       +cdabs(Ediffkzpos(ii2,jj2,3))**2)*dabs((
+     $                       -dble(i) *deltakx+kx)*(-dble(j)*deltakx
+     $                       +ky))
+                        
+                     else
+
+                        Emod=(cdabs(Ediffkzneg(ii,jj,1))**2
+     $                       +cdabs(Ediffkzneg(ii,jj,2))**2
+     $                       +cdabs(Ediffkzneg(ii,jj,3))**2)
+     $                       *dabs((dble(i2) *deltakx-kx)*(dble(j2)
+     $                       *deltakx-ky))+ (cdabs(Ediffkzneg(ii2,jj,1))
+     $                       **2 +cdabs(Ediffkzneg(ii2,jj,2))**2
+     $                       +cdabs(Ediffkzneg(ii2,jj,3))**2)*dabs((
+     $                       -dble(i) *deltakx+kx)*(dble(j2)*deltakx
+     $                       -ky))+ (cdabs(Ediffkzneg(ii,jj2,1))**2
+     $                       +cdabs(Ediffkzneg(ii,jj2,2))**2
+     $                       +cdabs(Ediffkzneg(ii,jj2,3))**2)
+     $                       *dabs((dble(i2) *deltakx-kx)*(-dble(j)
+     $                       *deltakx+ky))+ (cdabs(Ediffkzneg(ii2,jj2
+     $                       ,1))**2 +cdabs(Ediffkzneg(ii2,jj2,2))**2
+     $                       +cdabs(Ediffkzneg(ii2,jj2,3))**2)*dabs((
+     $                       -dble(i) *deltakx+kx)*(-dble(j)*deltakx
+     $                       +ky))
+                        
+                     endif
+
+                     
+
+                     Emod=Emod/deltakx/deltakx
+                     
+                     write(50,*) Emod*k0*k0*c/8/pi*quatpieps0
+                     poyntingfield(cnt) = Emod*k0*k0*c/8/pi *quatpieps0
+                  else
+                     if (thetas.le.pi/2.d0) then
+                        Emod=cdabs(Ediffkzpos(ii,jj,1))**2
+     $                       +cdabs(Ediffkzpos(ii,jj,2))**2
+     $                       +cdabs(Ediffkzpos(ii,jj,3))**2
+                     else
+                        Emod=cdabs(Ediffkzneg(ii,jj,1))**2
+     $                       +cdabs(Ediffkzneg(ii,jj,2))**2
+     $                       +cdabs(Ediffkzneg(ii,jj,3))**2
+                        
+                     endif
+                     write(50,*) Emod*k0*k0*c/8/pi*quatpieps0
+                     poyntingfield(cnt) = Emod*k0*k0*c/8/pi
+     $                    *quatpieps0
+                  endif
+               enddo
+            enddo
+
+         endif
+         write(*,*) 'End computation of Csca g and Poynting'
+         write(*,*) ' '
+      endif
+
+      if (nlentille.eq.1) then
+         
+         write(*,*) 'Microscopy with NA=',numaper,nfft2d       
+         if (numaper.le.0.d0.or.numaper.gt.1.d0) then
+            nstop=1
+            infostr='problem with numerical aperture!'
+            return
+         endif
+
+         if (dabs(gross).lt.1.d0) then
+            nstop=1
+            infostr='problem with manification!'
+            return
+         endif
+
+         
+         write(*,*) 'Compute the diffracted field'
+         nfft2d2=nfft2d/2
+         numaper=numaper*k0
+         
+         if (nquicklens.eq.0) then
+            write(*,*) 'Slow method'
+            Efourierx=0.d0
+            Efouriery=0.d0
+            Efourierz=0.d0
+            Efourierincx=0.d0
+            Efourierincy=0.d0
+            Efourierincz=0.d0
+            Eimageincx=0.d0
+            Eimageincy=0.d0
+            Eimageincz=0.d0
+            k=1
+ 222        deltakx=2.d0*pi/(dble(nfft2d)*aretecube)/dble(2**k)
+            imaxk0=nint(k0/deltakx)+1
+
+            if (imaxk0.le.20) then
+               k=k+1
+               write(*,*) 'change delta k',k,dble(nfft2d*(2**k)),nfft2d
+               goto 222
+            endif
+
+               
+            deltaky=deltakx
+            deltax=2.d0*pi/dble(nfft2d)/deltakx
+            
+            
+            do i=-nfft2d2,nfft2d2-1
+               
+               if (i.ge.0) then
+                  indicex=i+1
+               else
+                  indicex=nfft2d+i+1
+               endif
+
+               kx=deltakx*dble(i)
+               kxy(i+nfft2d2+1)=kx/k0
+               xy(i+nfft2d2+1)=deltax*dble(i)
+               do j=-nfft2d2,nfft2d2-1
+
+                  if (j.ge.0) then
+                     indicey=j+1
+                  else
+                     indicey=nfft2d+j+1
+                  endif
+
+                  ky=deltaky*dble(j)
+                  kz=1.d0
+                  indice=indicex+nfft2d*(indicey-1)
+                  if (dsqrt(kx*kx+ky*ky).le.numaper) then
+                     kz=dsqrt(k0*k0-kx*kx-ky*ky)
+c     write(*,*) 'coucou',i,j,kz
+c     compute theta and phi assuming z axis of the lens
+                     normal(1)=kx/k0
+                     normal(2)=ky/k0
+                     normal(3)=dsqrt(1.d0-normal(1)*normal(1)-normal(2)
+     $                    *normal(2))
+                     Emx=0.d0
+                     Emy=0.d0
+                     Emz=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO   REDUCTION(+:Emx,Emy,Emz)
+                     do ii=1,nbsphere
+                        kk=3*(ii-1)
+                        ctmp=cdexp(-icomp*k0*(normal(1)*xs(ii)+normal(2)
+     $                       *ys(ii)+normal(3)*zs(ii)))
+                        ctmp1=normal(1)*FF(kk+1)+normal(2)*FF(kk+2)
+     $                       +normal(3)*FF(kk+3)
+                        Emx=Emx+ctmp*(FF(kk+1)-ctmp1*normal(1))
+                        Emy=Emy+ctmp*(FF(kk+2)-ctmp1*normal(2))
+                        Emz=Emz+ctmp*(FF(kk+3)-ctmp1*normal(3))
+                     enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL                     
+                     ctmp=-2.d0*pi*icomp*kz                   
+                     kk=i+nfft2d2+1+nfft2d*(j+nfft2d2)
+c                     write(*,*) 'toto',kk,indice,i,j
+                     Efourierx(kk)=Emx*k0*k0/ctmp
+                     Efouriery(kk)=Emy*k0*k0/ctmp
+                     Efourierz(kk)=Emz*k0*k0/ctmp
+c     write(*,*) dsqrt(cdabs(Efourierx(kk))**2
+c     $                    +cdabs(Efouriery(kk))**2+cdabs(Efourierz(kk))
+c     $                    **2)
+c     calcul de l'axe de rotation et effectue la rotation 
+                     u1=-normal(2)
+                     u2=normal(1)
+                     tmp=dsqrt(u1*u1+u2*u2)
+                     if (tmp.eq.0.d0) then
+                        Eimageincx(indice)=Efourierx(kk)
+                        Eimageincy(indice)=Efouriery(kk)
+                        Eimageincz(indice)=Efourierz(kk)
+                     else
+                        u1=u1/tmp
+                        u2=u2/tmp
+
+c     rotation de theta plus theta'
+                        tmp=dasin(dsin(-dacos(normal(3)))/gross)
+     $                       -dacos(normal(3))
+
+                        Eimageincx(indice)=(u1*u1+(1.d0-u1*u1)
+     $                       *dcos(tmp))*Efourierx(kk)+u1*u2*(1.d0
+     $                       -dcos(tmp))*Efouriery(kk)+u2*dsin(tmp)
+     $                       *Efourierz(kk)
+                        Eimageincy(indice)=u1*u2*(1.d0-dcos(tmp))
+     $                       *Efourierx(kk)+(u2*u2+(1.d0-u2*u2)
+     $                       *dcos(tmp))*Efouriery(kk)-u1 *dsin(tmp)
+     $                       *Efourierz(kk)
+                        Eimageincz(indice)=-u2*dsin(tmp)*Efourierx(kk)
+     $                       +u1*dsin(tmp)*Efouriery(kk)+dcos(tmp)
+     $                       *Efourierz(kk)
+c     Eimageincx(indice)=Efourierx(kk)
+c     Eimageincy(indice)=Efouriery(kk)
+c     Eimageincz(indice)=Efourierz(kk)
+                     endif
+                     
+
+                  endif
+
+                  if (i.eq.-nfft2d2.or.j.eq.-nfft2d2) then
+                     Eimageincx(indice)=0.d0
+                     Eimageincy(indice)=0.d0
+                     Eimageincz(indice)=0.d0
+                  endif
+               enddo
+            enddo
+            write(*,*) 'fin calcul',imaxk0
+            open(400,file='kxfourier.mat')
+            open(401,file='ximage.mat')
+            do i=-nfft2d2,nfft2d2-1
+c               write(400,*) kxy(i+nfft2d2+1)
+               write(401,*) xy(i+nfft2d2+1)
+            enddo
+c     do i=-nfft2d2,nfft2d2-1
+            do i=-imaxk0,imaxk0
+               write(400,*) kxy(i+nfft2d2+1)
+             enddo
+            close(400)
+            close(401)
+
+            open(300,file='fourier.mat')         
+            open(301,file='fourierx.mat')         
+            open(302,file='fouriery.mat')         
+            open(303,file='fourierz.mat')                  
+            do j=-imaxk0,imaxk0
+               do i=-imaxk0,imaxk0
+c     do j=-nfft2d2,nfft2d2-1
+c               do i=-nfft2d2,nfft2d2-1
+                  k=(i+nfft2d2+1)+nfft2d*(j+nfft2d2)
+                  write(300,*) dsqrt(dreal(Efourierx(k)
+     $                 *dconjg(Efourierx(k))+Efouriery(k)
+     $                 *dconjg(Efouriery(k))+Efourierz(k)
+     $                 *dconjg(Efourierz(k))))
+                  write(301,*) dreal(Efourierx(k)),dimag(Efourierx(k))
+                  write(302,*) dreal(Efouriery(k)),dimag(Efouriery(k))
+                  write(303,*) dreal(Efourierz(k)),dimag(Efourierz(k)) 
+               enddo
+            enddo
+c     do i=1,nfft2D*nfft2D           
+c               write(300,*) dsqrt(dreal(Efourierx(i)
+c     $              *dconjg(Efourierx(i))+Efouriery(i)
+c     $              *dconjg(Efouriery(i))+Efourierz(i)
+c     $              *dconjg(Efourierz(i))))
+c               write(301,*) dreal(Efourierx(i)),dimag(Efourierx(i))
+c               write(302,*) dreal(Efouriery(i)),dimag(Efouriery(i))
+c               write(303,*) dreal(Efourierz(i)),dimag(Efourierz(i)) 
+c            enddo
+            close(300)
+            close(301)
+            close(302)
+            close(303)
+            write(*,*) 'fin calcul2',imaxk0
+
+         else
+            
+            write(*,*) 'Quick FFT method'
+            
+            call diffractefft2dlens(nx,ny,nz,nxm,nym,nzm,nfft2d,k0,xs,ys
+     $           ,zs,aretecube,Efourierx,Efouriery,Efourierz,FF,imaxk0
+     $           ,deltakx,deltaky,Ediffkzpos,numaper,nstop,infostr)
+            deltax=2.d0*pi/dble(nfft2d)/deltakx
+            write(*,*) 'imax',nfft2d,k0,E0,ss,pp,theta,phi,xdip ,ydip
+     $           ,zdip,xgaus,ygaus,zgaus,w0,tol,imaxk0,deltakx ,deltaky
+c     calcul le champ incident
+            call  diffractefft2dinc(nfft2d,k0,E0,ss,pp,theta,phi,xdip
+     $           ,ydip,zdip,xgaus,ygaus,zgaus,w0,aretecube,tol,Efourierx
+     $           ,Efouriery,Efourierz,imaxk0,deltakx,deltaky,Ediffkzpos
+     $           ,numaper,beam,nstop,infostr)
+c            stop
+              
+            open(400,file='kxfourier.mat')
+            open(401,file='ximage.mat')
+            do i=-nfft2d2,nfft2d2-1
+               kx=deltakx*dble(i)
+               xy(i+nfft2d2+1)=deltax*dble(i)
+               kxy(i+nfft2d2+1)=kx/k0
+               write(401,*) xy(i+nfft2d2+1)
+            enddo
+            do i=-imaxk0,imaxk0
+               write(400,*) kxy(i+nfft2d2+1)
+            enddo
+            close(400)
+            close(401)
+            Efourierx=0.d0
+            Efouriery=0.d0
+            Efourierz=0.d0
+            Eimageincx=0.d0
+            Eimageincy=0.d0
+            Eimageincz=0.d0
+            do i=-imaxk0,imaxk0
+               if (i.ge.0) then
+                  indicex=i+1
+               else
+                  indicex=nfft2d+i+1
+               endif
+               do j=-imaxk0,imaxk0
+                  if (j.ge.0) then
+                     indicey=j+1
+                  else
+                     indicey=nfft2d+j+1
+                  endif
+                  indice=indicex+nfft2d*(indicey-1)
+
+                  kx=deltakx*dble(i)
+                  ky=deltakx*dble(j)
+                  kz=k0*k0-kx*kx-ky*ky
+                  if (kz.ge.0.d0) then
+                     kz=dsqrt(kz)
+                  else
+                     kz=0.d0
+                  endif
+                  u1=-ky/k0
+                  u2=kx/k0
+                  tmp=dsqrt(u1*u1+u2*u2)
+
+                  ii=imaxk0+i+1
+                  jj=imaxk0+j+1
+                  kk=i+nfft2d2+1+nfft2d*(j+nfft2d2)
+                  Efourierx(kk)=Ediffkzpos(ii,jj,1)
+                  Efouriery(kk)=Ediffkzpos(ii,jj,2)
+                  Efourierz(kk)=Ediffkzpos(ii,jj,3)
+                  if (tmp.eq.0.d0) then                    
+                     Eimageincx(indice)=Efourierx(kk)
+                     Eimageincy(indice)=Efouriery(kk)
+                     Eimageincz(indice)=Efourierz(kk)
+                  else
+                     u1=u1/tmp
+                     u2=u2/tmp
+                     normal(3)=kz/k0
+                     tmp=dasin(dsin(-dacos(normal(3)))/gross)
+     $                    -dacos(normal(3))
+
+                     Eimageincx(indice)=(u1*u1+(1.d0-u1*u1) *dcos(tmp))
+     $                    *Efourierx(kk)+u1*u2*(1.d0 -dcos(tmp))
+     $                    *Efouriery(kk)+u2*dsin(tmp) *Efourierz(kk)
+                     Eimageincy(indice)=u1*u2*(1.d0-dcos(tmp))
+     $                    *Efourierx(kk)+(u2*u2+(1.d0-u2*u2) *dcos(tmp))
+     $                    *Efouriery(kk)-u1 *dsin(tmp) *Efourierz(kk)
+                     Eimageincz(indice)=-u2*dsin(tmp)*Efourierx(kk) +u1
+     $                    *dsin(tmp)*Efouriery(kk)+dcos(tmp)
+     $                    *Efourierz(kk)
+
+                  endif
+               enddo
+            enddo
+            
+            open(300,file='fourier.mat')         
+            open(301,file='fourierx.mat')         
+            open(302,file='fouriery.mat')         
+            open(303,file='fourierz.mat')  
+            do j=-imaxk0,imaxk0
+               do i=-imaxk0,imaxk0
+                  k=(i+nfft2d2+1)+nfft2d*(j+nfft2d2)
+                  write(300,*) dsqrt(dreal(Efourierx(k)
+     $                 *dconjg(Efourierx(k))+Efouriery(k)
+     $                 *dconjg(Efouriery(k))+Efourierz(k)
+     $                 *dconjg(Efourierz(k))))
+                  write(301,*) dreal(Efourierx(k)),dimag(Efourierx(k))
+                  write(302,*) dreal(Efouriery(k)),dimag(Efouriery(k))
+                  write(303,*) dreal(Efourierz(k)),dimag(Efourierz(k)) 
+               enddo
+            enddo      
+
+c            do i=1,nfft2D*nfft2D           
+c               write(300,*) dsqrt(dreal(Efourierx(i)
+c     $              *dconjg(Efourierx(i))+Efouriery(i)
+c     $              *dconjg(Efouriery(i))+Efourierz(i)
+c     $              *dconjg(Efourierz(i))))
+c               write(301,*) dreal(Efourierx(i)),dimag(Efourierx(i))
+c               write(302,*) dreal(Efouriery(i)),dimag(Efouriery(i))
+c               write(303,*) dreal(Efourierz(i)),dimag(Efourierz(i)) 
+c            enddo
+            close(300)
+            close(301)
+            close(302)
+            close(303)
+c     do i=1,nfft2D  
+c     write(124,9999) (cdabs(Efouriery(i+nfft2d*(j-1))),j=1
+c     $              ,nfft2d)
+c     enddo
+         endif
+
+         write(*,*) 'Compute the image through the microsocpe'
+         
+         tmp=deltakx*deltaky
+
+c     Compute the FFT inverse to get the image through the microscope
+!     $OMP PARALLEL 
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT2D(Eimageincx,nfft2D,nfft2D,1)
+!     $OMP SECTION         
+         CALL ZFFT2D(Eimageincy,nfft2D,nfft2D,1)
+!     $OMP SECTION          
+         CALL ZFFT2D(Eimageincz,nfft2D,nfft2D,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL
+         write(*,*) 'FFT'
+         do i=-nfft2d2,nfft2d2-1
+
+            if (i.ge.0) then
+               indicex=i+1
+            else
+               indicex=nfft2d+i+1
+            endif
+
+            do j=-nfft2d2,nfft2d2-1
+
+               if (j.ge.0) then
+                  indicey=j+1
+               else
+                  indicey=nfft2d+j+1
+               endif
+
+               indice=indicex+nfft2d*(indicey-1)
+               kk=i+nfft2d2+1+nfft2d*(j+nfft2d2)
+               Eimagex(kk)=Eimageincx(indice)*tmp
+               Eimagey(kk)=Eimageincy(indice)*tmp
+               Eimagez(kk)=Eimageincz(indice)*tmp
+               write(644,*) Eimagex(kk)
+               write(645,*)  Eimagey(kk)
+               write(646,*)   Eimagez(kk)
+            enddo
+         enddo
+
+c     calcul intensite de l'image
+         open(301,file='image.mat')
+         open(302,file='imagex.mat')
+         open(303,file='imagey.mat')
+         open(304,file='imagez.mat')
+         open(305,file='imageinc.mat')
+         open(306,file='imageincx.mat')
+         open(307,file='imageincy.mat')
+         open(308,file='imageincz.mat')
+         do i=1,nfft2D*nfft2D
+            write(999,*) dsqrt(dreal(Eimagex(i)*dconjg(Eimagex(i))
+     $           +Eimagey(i) *dconjg(Eimagey(i))+Eimagez(i)
+     $           *dconjg(Eimagez(i))))
+         enddo
+         z=0.d0
+c     transforme le theta incident pour tenir compte du grossissement
+         thetag=-dasin(dsin(theta)/gross)
+c     si theta fait que l'onde arrive par le haut alors on ne rajoutte
+c     pas le champ incident car la lentille est au dessus.
+         if (dabs(theta).le.pi/2.d0) then
+c     Attention on a nfft2d points selon x et
+c     on part de -nfft2d/2*dx pour aller vers (nfft2d/2-1)*dx
+c     On a utilisé cette convention pour la fft
+c     Le centre de la ligne est donc en nfft2d/2+1  !!!!
+            do i=1,nfft2d
+               x=deltax*dble(i-nfft2d2-1)
+               do j=1,nfft2d
+                  y=deltax*dble(j-nfft2d2-1)
+                  indice=i+nfft2d*(j-1)
+                  if (beam(1:11).eq.'pwavelinear') then
+                     call ondeplane(x,y,z,k0,E0,ss,pp,theta,phi,Em(1)
+     $                    ,Em(2),Em(3),nstop,infostr)
+                  elseif (beam(1:13).eq.'pwavecircular') then
+                     call ondecirce(x,y,z,k0,E0,ss,theta,phi,Em(1),Em(2)
+     $                    ,Em(3))
+                  elseif (beam(1:7).eq.'antenna') then
+                     call dipoleinc(xdip,ydip,zdip,theta,phi,x,y,z
+     $                    ,aretecube,k0,E0,Em(1),Em(2),Em(3),nstop
+     $                    ,infostr)                     
+                  elseif (beam(1:11).eq.'gwavelinear') then
+                     call gaussianchamp(x,y,z,xgaus,ygaus,zgaus,theta
+     $                    ,phi,w0,k0,ss,pp,E0,Em(1),Em(2),Em(3),tol
+     $                    ,nloin,nstop,infostr)
+                  elseif (beam(1:13).eq.'gwavecircular') then
+                     call gaussianchampcirc(x,y,z,xgaus,ygaus,zgaus
+     $                    ,theta,phi,w0,k0,ss,E0,Em(1),Em(2),Em(3),tol
+     $                    ,nloin)
+                  elseif (beam(1:15).eq.'gparawavelinear') then
+                     call gaussianparalinear(x,y,z,xgaus,ygaus,zgaus
+     $                    ,theta,phi,w0,k0,ss,pp,E0,Em(1),Em(2),Em(3)
+     $                    ,nstop,infostr)
+                  elseif (beam(1:17).eq.'gparawavecircular') then
+                     call gaussianparacirc(x,y,z,xgaus,ygaus,zgaus,theta
+     $                    ,phi,w0,k0,ss,E0,Em(1),Em(2),Em(3),nstop
+     $                    ,infostr)
+                  elseif (beam(1:13).eq.'arbitrary') then                   
+                     call incidentarbitrarypos(x,y,z,aretecube,Em(1)
+     $                    ,Em(2),Em(3),nstop,namefileinc,infostr)
+                  endif
+                  Eimageincx(indice)=Eimagex(indice)+Em(1)
+                  Eimageincy(indice)=Eimagey(indice)+Em(2)
+                  Eimageincz(indice)=Eimagez(indice)+Em(3)
+               enddo
+            enddo
+         endif
+         do i=1,nfft2D*nfft2D
+            write(301,*) dsqrt(dreal(Eimagex(i)*dconjg(Eimagex(i))
+     $           +Eimagey(i)*dconjg(Eimagey(i))+Eimagez(i)
+     $           *dconjg(Eimagez(i))))
+            write(302,*) dreal(Eimagex(i)),dimag(Eimagex(i))
+            write(303,*) dreal(Eimagey(i)),dimag(Eimagey(i))
+            write(304,*) dreal(Eimagez(i)),dimag(Eimagez(i))
+            write(305,*) dsqrt(dreal(Eimageincx(i)*dconjg(Eimageincx(i))
+     $           +Eimageincy(i)*dconjg(Eimageincy(i))+Eimageincz(i)
+     $           *dconjg(Eimageincz(i))))
+            write(306,*) dreal(Eimageincx(i)),dimag(Eimageincx(i))
+            write(307,*) dreal(Eimageincy(i)),dimag(Eimageincy(i))
+            write(308,*) dreal(Eimageincz(i)),dimag(Eimageincz(i))
+         enddo
+         close(301)
+         close(302)
+         close(303)
+         close(304)
+         close(305)
+         close(306)
+         close(307)
+         close(308)
+         write(*,*) 'End image through the microsocpe'
+         write(*,*) 'End microscopy'
+         write(*,*) ' '
+      endif
+
+      
+
+      if (nforce.eq.1) then
+         write(99,*) '****** Compute the optical force *********'
+         write(*,*) 'Compute the optical force'
+c     Begin the computation of the force
+c     Compute the FFT of the dipole
+         vectx=0.d0
+         vecty=0.d0
+         vectz=0.d0
+         do k=1,nz
+            do j=1,ny
+               do i=1,nx
+                  ii=i+nx*(j-1)+nx*ny*(k-1)
+                  indice=i+nx2*(j-1)+nxy2*(k-1)
+                  if (Tabdip(ii).ne.0) then                    
+                     jj=3*Tabdip(ii)
+                     vectx(indice)=FF(jj-2)
+                     vecty(indice)=FF(jj-1)
+                     vectz(indice)=FF(jj)
+                  endif     
+               enddo
+            enddo
+         enddo
+!     $OMP PARALLEL 
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT3D(vectx,NX2,NY2,NZ2,1)
+!     $OMP SECTION              
+         CALL ZFFT3D(vecty,NX2,NY2,NZ2,1)
+!     $OMP SECTION              
+         CALL ZFFT3D(vectz,NX2,NY2,NZ2,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL 
+         
+c     do i=1,nx2*ny2*nz2
+c     write(99,*) 'vect',vectx(i),vecty(i),vectz(i)
+c     enddo
+c     Compute the x derivative of the local field
+         test=1 
+         
+         if(beam(1:11).eq.'gwavelinear'.or.beam(1:13).eq
+     $        .'gwavecircular'.or.beam(1:15).eq.'gparawavelinear'
+     $        .or.beam(1:17).eq.'gparawavecircular') then
+            open(150,file='dergaussy.mat',form='unformatted')
+            open(151,file='dergaussz.mat',form='unformatted')
+         elseif (beam(1:9).eq.'arbitrary') then
+            call incidentarbitrarydercreate(namefileinc)
+         endif
+         call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
+     $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $        ,test,FF0)
+         do i=1,ndipole
+            ii=3*i
+            if (Tabdip(i).ne.0) then
+               j=Tabdip(i)  
+               if (beam(1:11).eq.'pwavelinear') then
+                  call  ondeplaned(xs(j),ys(j),zs(j),k0,E0,ss,pp,theta
+     $                 ,phi,test,Eder)  
+               elseif(beam(1:13).eq.'pwavecircular') then
+                  call  ondecirced(xs(j),ys(j),zs(j),k0,E0,ss,theta,phi
+     $                 ,test,Eder) 
+               elseif (beam(1:7).eq.'antenna') then
+                  call dipoleincder(xdip,ydip,zdip,theta,phi,xs(j),ys(j)
+     $                 ,zs(j),aretecube,k0,E0,Eder,test,nstop,infostr)
+                  write(*,*) xdip,ydip,zdip,k0,test,Eder(1,1),icomp*k0
+     $                 *E0/xdip,E0
+               elseif(beam(1:11).eq.'gwavelinear') then
+                  call  gaussianchampd(xs(j),ys(j),zs(j),xgaus,ygaus
+     $                 ,zgaus,theta,phi,w0,k0,ss,pp,E0,Eder,tol,nloin)
+                  write(150) Eder(1,2)
+                  write(150) Eder(2,2)
+                  write(150) Eder(3,2)
+                  write(151) Eder(1,3)
+                  write(151) Eder(2,3)
+                  write(151) Eder(3,3)
+               elseif(beam(1:13).eq.'gwavecircular') then
+                  call  gaussianchampdcirc(xs(j),ys(j),zs(j),xgaus,ygaus
+     $                 ,zgaus,theta,phi,w0,k0,ss,E0,Eder,tol,nloin)
+                  write(150) Eder(1,2)
+                  write(150) Eder(2,2)
+                  write(150) Eder(3,2)
+                  write(151) Eder(1,3)
+                  write(151) Eder(2,3)
+                  write(151) Eder(3,3)
+               elseif(beam(1:15).eq.'gparawavelinear') then
+                  call  gaussianparalineard(xs(j),ys(j),zs(j),xgaus
+     $                 ,ygaus,zgaus,theta,phi,w0,k0,ss,pp,E0,Eder,nstop
+     $                 ,infostr)
+                  write(150) Eder(1,2)
+                  write(150) Eder(2,2)
+                  write(150) Eder(3,2)
+                  write(151) Eder(1,3)
+                  write(151) Eder(2,3)
+                  write(151) Eder(3,3)
+               elseif(beam(1:17).eq.'gparawavecircular') then
+                  call  gaussianparacircd(xs(j),ys(j),zs(j),xgaus,ygaus
+     $                 ,zgaus,theta,phi,w0,k0,ss,E0,Eder,nstop,infostr)
+                  write(150) Eder(1,2)
+                  write(150) Eder(2,2)
+                  write(150) Eder(3,2)
+                  write(151) Eder(1,3)
+                  write(151) Eder(2,3)
+                  write(151) Eder(3,3)
+               elseif (beam(1:9).eq.'arbitrary') then
+c     call  ondeplaned(xs(j),ys(j),zs(j),k0,E0,ss,pp,theta
+c     $                 ,phi,test,Eder)  
+c     write(*,*) 'Eder1',Eder
+                  call incidentarbitraryder1(test,xs(j),ys(j),zs(j)
+     $                 ,Eder)
+c     write(*,*) 'Eder2',Eder
+               endif 
+               wrk(j,1)=Eder(1,1)+FF0(ii-2)
+               wrk(j,2)=Eder(2,1)+FF0(ii-1)
+               wrk(j,3)=Eder(3,1)+FF0(ii)            
+c     write(*,*) 'i derivee',j
+c     write(*,*) 'Ederx',Eder(1,1),Eder(2,1),Eder(3,1)
+c     write(*,*) 'Edery',Eder(1,2),Eder(2,2),Eder(3,2)
+c     write(*,*) 'Ederz',Eder(1,3),Eder(2,3),Eder(3,3)
+
+            endif
+         enddo
+         rewind(150)
+         rewind(151)
+c     Compute the y derivative of the local field
+         vectx=0.d0
+         vecty=0.d0
+         vectz=0.d0
+         do k=1,nz
+            do j=1,ny
+               do i=1,nx
+                  ii=i+nx*(j-1)+nx*ny*(k-1)
+                  indice=i+nx2*(j-1)+nxy2*(k-1)
+                  if (Tabdip(ii).ne.0) then                    
+                     jj=3*Tabdip(ii)
+                     vectx(indice)=FF(jj-2)
+                     vecty(indice)=FF(jj-1)
+                     vectz(indice)=FF(jj)
+                  endif     
+               enddo
+            enddo
+         enddo
+
+!     $OMP PARALLEL 
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT3D(vectx,NX2,NY2,NZ2,1)
+!     $OMP SECTION           
+         CALL ZFFT3D(vecty,NX2,NY2,NZ2,1)
+!     $OMP SECTION          
+         CALL ZFFT3D(vectz,NX2,NY2,NZ2,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL 
+         
+         test=2
+         call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
+     $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $        ,test,FF0)
+         do i=1,ndipole
+            ii=3*i
+            if (Tabdip(i).ne.0) then
+               j=Tabdip(i)    
+               if (beam(1:11).eq.'pwavelinear') then
+                  call  ondeplaned(xs(j),ys(j),zs(j),k0,E0,ss,pp,theta
+     $                 ,phi,test,Eder) 
+               elseif(beam(1:13).eq.'pwavecircular') then
+                  call  ondecirced(xs(j),ys(j),zs(j),k0,E0,ss,theta,phi
+     $                 ,test,Eder)   
+               elseif (beam(1:7).eq.'antenna') then
+                  call dipoleincder(xdip,ydip,zdip,theta,phi,xs(j),ys(j)
+     $                 ,zs(j),aretecube,k0,E0,Eder,test,nstop,infostr)
+               elseif(beam(1:11).eq.'gwavelinear') then
+                  read(150) Eder(1,2)
+                  read(150) Eder(2,2)
+                  read(150) Eder(3,2)                 
+               elseif(beam(1:13).eq.'gwavecircular') then
+                  read(150) Eder(1,2)
+                  read(150) Eder(2,2)
+                  read(150) Eder(3,2)
+               elseif(beam(1:15).eq.'gparawavelinear') then
+                  read(150) Eder(1,2)
+                  read(150) Eder(2,2)
+                  read(150) Eder(3,2)                 
+               elseif(beam(1:17).eq.'gparawavecircular') then
+                  read(150) Eder(1,2)
+                  read(150) Eder(2,2)
+                  read(150) Eder(3,2)
+               elseif (beam(1:9).eq.'arbitrary') then
+                  call incidentarbitraryder1(test,xs(j),ys(j),zs(j)
+     $                 ,Eder)
+               endif 
+               j=j+nmax
+               wrk(j,1)=Eder(1,2)+FF0(ii-2)
+               wrk(j,2)=Eder(2,2)+FF0(ii-1)
+               wrk(j,3)=Eder(3,2)+FF0(ii)
+            endif
+         enddo
+c     Compute the z derivative of the local field
+         vectx=0.d0
+         vecty=0.d0
+         vectz=0.d0
+         do k=1,nz
+            do j=1,ny
+               do i=1,nx
+                  ii=i+nx*(j-1)+nx*ny*(k-1)
+                  indice=i+nx2*(j-1)+nxy2*(k-1)
+                  if (Tabdip(ii).ne.0) then                    
+                     jj=3*Tabdip(ii)
+                     vectx(indice)=FF(jj-2)
+                     vecty(indice)=FF(jj-1)
+                     vectz(indice)=FF(jj)
+                  endif     
+               enddo
+            enddo
+         enddo
+!     $OMP PARALLEL 
+!     $OMP SECTIONS 
+!     $OMP SECTION            
+         CALL ZFFT3D(vectx,NX2,NY2,NZ2,1)
+!     $OMP SECTION             
+         CALL ZFFT3D(vecty,NX2,NY2,NZ2,1)
+!     $OMP SECTION             
+         CALL ZFFT3D(vectz,NX2,NY2,NZ2,1)
+!     $OMP END SECTIONS
+!     $OMP END PARALLEL 
+         
+         test=3
+         call derivativefield2(aretecube,k0,nx,ny,nz,nx2,ny2,nz2,nxy2
+     $        ,ntotal,ntotalm,nmax,FFTTENSORxx,FFTTENSORxy,FFTTENSORxz
+     $        ,FFTTENSORyy,FFTTENSORyz,FFTTENSORzz,vectx,vecty,vectz
+     $        ,test,FF0)
+         do i=1,ndipole
+            ii=3*i
+            if (Tabdip(i).ne.0) then
+               j=Tabdip(i) 
+               if (beam(1:11).eq.'pwavelinear') then
+                  call  ondeplaned(xs(j),ys(j),zs(j),k0,E0,ss,pp,theta
+     $                 ,phi,test,Eder)   
+c     write(99,*) 'coucou',xs(j),ys(j),zs(j),k0,E0,ss,pp
+c     $                 ,theta,phi,test,Eder,j,i,ndipole
+               elseif(beam(1:13).eq.'pwavecircular') then
+                  call  ondecirced(xs(j),ys(j),zs(j),k0,E0,ss,theta,phi
+     $                 ,test,Eder)   
+               elseif (beam(1:7).eq.'antenna') then
+                  call dipoleincder(xdip,ydip,zdip,theta,phi,xs(j),ys(j)
+     $                 ,zs(j),aretecube,k0,E0,Eder,test,nstop,infostr)
+               elseif(beam(1:11).eq.'gwavelinear') then
+                  read(151) Eder(1,3)
+                  read(151) Eder(2,3)
+                  read(151) Eder(3,3)                 
+               elseif(beam(1:13).eq.'gwavecircular') then
+                  read(151) Eder(1,3)
+                  read(151) Eder(2,3)
+                  read(151) Eder(3,3)
+               elseif(beam(1:15).eq.'gparawavelinear') then
+                  read(151) Eder(1,3)
+                  read(151) Eder(2,3)
+                  read(151) Eder(3,3)                 
+               elseif(beam(1:17).eq.'gparawavecircular') then
+                  read(151) Eder(1,3)
+                  read(151) Eder(2,3)
+                  read(151) Eder(3,3)
+               elseif (beam(1:9).eq.'arbitrary') then
+c     call  ondeplaned(xs(j),ys(j),zs(j),k0,uncomp,0.d0,1.d0
+c     $                 ,0.d0,0.d0,test,Eder) 
+c     write(*,*) 'Ederz1',Eder
+                  call incidentarbitraryder1(test,xs(j),ys(j),zs(j)
+     $                 ,Eder)
+c     write(*,*) 'Ederz2',Eder
+               endif 
+               j=j+2*nmax
+               wrk(j,1)=Eder(1,3)+FF0(ii-2)
+               wrk(j,2)=Eder(2,3)+FF0(ii-1)
+               wrk(j,3)=Eder(3,3)+FF0(ii)
+            endif
+         enddo
+         close(150)
+         close(151)
+c     comptute the optical force from the derivative of the local field
+c     and the dipole
+!     $OMP PARALLEL 
+!     $OMP DO  
+         do i=1,nbsphere3
+            FF0(i)=dconjg(FF(i))
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL
+         forcet(1)=0.d0
+         forcet(2)=0.d0
+         forcet(3)=0.d0
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:forcet(1),forcet(2),forcet(3))
+         do i=1,nbsphere 
+c     write(*,*) 'ooooooooooooo',i,nbsphere
+            k=3*(i-1)
+            force(i,1)=0.5d0*dreal(FF0(k+1)*wrk(i,1)+FF0(k+2) *wrk(i,2)
+     $           +FF0(k+3)*wrk(i,3))*quatpieps0       
+            j=i+nmax
+            force(i,2)=0.5d0*dreal(FF0(k+1)*wrk(j,1)+FF0(k+2) *wrk(j,2)
+     $           +FF0(k+3)*wrk(j,3))*quatpieps0       
+            j=i+2*nmax
+            force(i,3)=0.5d0*dreal(FF0(k+1)*wrk(j,1)+FF0(k+2) *wrk(j,2)
+     $           +FF0(k+3)*wrk(j,3))*quatpieps0 
+c     write(*,*) 'champ',FF0(k+1),FF0(k+2),FF0(k+3)
+c     write(*,*) 'champdx',Ederivex(i,1),Ederivex(i,2),Ederivex(i
+c     $           ,3)
+c     write(*,*) 'champdy',Ederivey(i,1),Ederivey(i,2),Ederivey(i
+c     $           ,3)
+c     write(*,*) 'champdz',Ederivez(i,1),Ederivez(i,2),Ederivez(i
+c     $           ,3)
+c     write(*,*) 'force',force(i,1),force(i,2),force(i,3)
+            forcet(1)=forcet(1)+force(i,1)
+            forcet(2)=forcet(2)+force(i,2)
+            forcet(3)=forcet(3)+force(i,3)
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL      
+c     write(*,*) 'coucou'
+         if (nstop == -1) then
+            infostr = 'Calculation cancelled at the optical force!'
+            return
+         endif
+c     save the density of force
+c         subunit=0
+         if (nforced.eq.1) then
+            do i=1,ndipole
+c               subunit= subunit+1
+               k=tabdip(i)
+               if (k.ne.0) then
+                  forcex(k) = force(k,1)
+                  forcey(k) = force(k,2)
+                  forcez(k) = force(k,3)
+                  write(60,*) force(k,1)
+                  write(61,*) force(k,2)
+                  write(62,*) force(k,3)
+               else
+c                  forcex(subunit) = 0.d0
+c                  forcey(subunit) = 0.d0
+c                  forcez(subunit) = 0.d0
+                  write(60,*) 0.d0
+                  write(61,*) 0.d0
+                  write(62,*) 0.d0
+               endif
+            enddo        
+         endif
+
+         forcem=dsqrt(forcet(1)*forcet(1)+forcet(2)*forcet(2)+forcet(3)
+     $        *forcet(3))
+         write(99,*) 'optical force x',forcet(1)
+         write(99,*) 'optical force y',forcet(2)
+         write(99,*) 'optical force z',forcet(3)
+         write(*,*) 'Optical force x',forcet(1)
+         write(*,*) 'Optical force y',forcet(2)
+         write(*,*) 'Optical force z',forcet(3)
+c     write(*,*) 'optical force x',forcet(1)
+c     write(*,*) 'optical force y',forcet(2)
+c     write(*,*) 'optical force z',forcet(3)
+c     forcemie=(MIECext-GSCA*MIECsca)/8.d0/pi
+         write(99,*) 'Modulus of the force',forcem
+         write(*,*) 'End optical force'
+         write(*,*) ' '
+      endif 
+      write(*,*) 'test',ntorque,nforce
+      if (ntorque*nforce.eq.1) then
+         write(99,*) ' Compute the optical torque '
+         write(*,*) ' Compute the optical torque '
+c     Compute the optical torque on the particle 
+         couplet(1)=0.d0
+         couplet(2)=0.d0
+         couplet(3)=0.d0
+c     compute the center of gravity of the object
+         xg=0.d0
+         yg=0.d0
+         zg=0.d0
+         do i=1,nbsphere
+            xg=xg+xs(i)
+            yg=yg+ys(i)
+            zg=zg+zs(i)
+         enddo
+         xg=xg/dble(nbsphere)
+         yg=yg/dble(nbsphere)
+         zg=zg/dble(nbsphere)
+         write(99,*) 'position of the center of gravity',xg,yg,zg
+         write(*,*) 'position of the center of gravity',xg,yg,zg
+c     gamma=r x F+1/2 Re(p^* x p / alpha_0)
+!     $OMP PARALLEL 
+!     $OMP DO  REDUCTION(+:couplet(1),couplet(2),couplet(3))
+         do i=1,nbsphere
+            kk=3*(i-1)
+
+            do ii=1,3
+               Em(ii)=2.d0/3.d0*icomp*k03*FF(kk+ii)+FFloc(kk+ii)
+            enddo
+
+            couple(i,1)=0.5d0*dreal(FF0(kk+2)*Em(3)-FF0(kk+3)*Em(2))
+     $           *quatpieps0+((ys(i)-yg)*force(i,3)-(zs(i)-zg)*force(i
+     $           ,2))
+c            write(*,*) 'x',0.5d0*dreal(FF0(kk+2)*Em(3)-FF0(kk+3)*Em(2))
+c     $           *quatpieps0,((ys(i)-yg)*force(i,3)-(zs(i)-zg)*force(i
+c     $           ,2)),(ys(i)-yg)*force(i,3),(zs(i)-zg)*force(i ,2)
+            couple(i,2)=0.5d0*dreal(-FF0(kk+1)*Em(3)+FF0(kk+3)*Em(1))
+     $           *quatpieps0+((zs(i)-zg)*force(i,1)-(xs(i)-xg)*force(i
+     $           ,3))
+c            write(*,*) 'y',0.5d0*dreal(-FF0(kk+1)*Em(3)+FF0(kk+3)*Em(1))
+c     $           *quatpieps0,((zs(i)-zg)*force(i,1)-(xs(i)-xg)*force(i
+c     $           ,3)),(zs(i)-zg)*force(i,1),(xs(i)-xg)*force(i ,3)
+            couple(i,3)=0.5d0*dreal(FF0(kk+1)*Em(2)-FF0(kk+2)*Em(1))
+     $           *quatpieps0+((xs(i)-xg)*force(i,2)-(ys(i)-yg)*force(i
+     $           ,1))
+            couplet(1)=couplet(1)+couple(i,1)
+            couplet(2)=couplet(2)+couple(i,2)
+            couplet(3)=couplet(3)+couple(i,3)               
+         enddo
+!     $OMP ENDDO 
+!     $OMP END PARALLEL   
+c     save the density of torque
+         if (nstop == -1) then
+            infostr = 'Calculation cancelled at the optical torque!'
+            return
+         endif
+c         subunit=0
+         if (ntorqued.eq.1) then
+            do i=1,ndipole
+c               subunit= subunit+1
+               k=tabdip(i)
+               if (k.ne.0) then
+                  torquex(k) = couple(k,1)
+                  torquey(k) = couple(k,2)
+                  torquez(k) = couple(k,3)
+                  write(63,*) couple(k,1)
+                  write(64,*) couple(k,2)
+                  write(65,*) couple(k,3)
+               else
+c                  torquex(subunit) = 0.d0
+c                  torquey(subunit) = 0.d0
+c                  torquez(subunit) = 0.d0
+                  write(63,*) 0.d0
+                  write(64,*) 0.d0
+                  write(65,*) 0.d0                                    
+               endif
+            enddo
+         endif
+
+         couplem=dsqrt(couplet(1)*couplet(1)+couplet(2)*couplet(2)
+     $        +couplet(3)*couplet(3))
+         write(99,*) 'Optical torque x',couplet(1)
+         write(99,*) 'Optical torque y',couplet(2)
+         write(99,*) 'Optical torque z',couplet(3)
+         write(*,*) 'optical torque x',couplet(1)
+         write(*,*) 'optical torque y',couplet(2)
+         write(*,*) 'optical torque z',couplet(3)
+         write(99,*) 'modulus of the optical torque',couplem
+         write(*,*) 'End optical torque',Cabs/8.d0/k0/pi*I0*quatpieps0
+      endif
+c     calcul sur des forces et couple sur differents objets si presents
+      if (numberobjet.ne.1) then
+         forcexmulti=0.d0
+         forceymulti=0.d0
+         forcezmulti=0.d0
+         torquexmulti=0.d0
+         torqueymulti=0.d0
+         torquezmulti=0.d0    
+         do i=1,nbsphere
+            is=tabmulti(i)
+            forcexmulti(is)=forcexmulti(is)+force(i,1)
+            forceymulti(is)=forceymulti(is)+force(i,2)
+            forcezmulti(is)=forcezmulti(is)+force(i,3)
+            torquexmulti(is)=torquexmulti(is)+couple(i,1)
+            torqueymulti(is)=torqueymulti(is)+couple(i,2)
+            torquezmulti(is)=torquezmulti(is)+couple(i,3)            
+         enddo
+      endif
+      if (numberobjet.ge.2) then
+         do is=1,numberobjet
+            write(*,*) 'Optical force for the',is,'object'
+            write(*,*) 'optical force x',forcexmulti(is)
+            write(*,*) 'optical force y',forceymulti(is)
+            write(*,*) 'optical force z',forcezmulti(is)
+            write(*,*) 'Optical torque for the',is,'object'
+            write(*,*) 'optical torque x',torquexmulti(is)
+            write(*,*) 'optical torque y',torqueymulti(is)
+            write(*,*) 'optical torque z',torquezmulti(is)
+         enddo
+      endif
+
+      
+c     close files
+c     Intensity of the incident field
+      close(36)
+      close(37)
+      close(38)
+      close(39)
+c     Intensity of the local field
+      close(40)
+      close(41)
+      close(42)
+      close(43)
+c     Intensity of the macroscopic field
+      close(44)
+      close(45)
+      close(46)
+      close(47)
+c     Intensity of the incident field wide field
+      close(136)
+      close(137)
+      close(138)
+      close(139)
+c     Intensity of the local field wide field
+      close(140)
+      close(141)
+      close(142)
+      close(143)
+c     Intensity of the macroscopic field wide field
+      close(144)
+      close(145)
+      close(146)
+      close(147)
+c     save the Poynting vecteur
+      close(50)
+      close(51)
+      close(52)
+c     save  the Poynting vecteur in kx ky
+      close(53)
+      close(54)
+      close(55)
+      close(56)
+c     save the density of the optical force
+      close(60)
+      close(61)
+      close(62)
+c     save the density of optical torque
+      close(63)
+      close(64)
+      close(65)
+c     Far field discretization
+      close(67)
+      close(68)
+      close(69)
+c     output file
+      close(99)
+ 9999 format(512(d22.15,1x))
+      write(*,*) 'prout',  lambda,beam,object,trope, materiaumulti,nnnr
+     $     ,tolinit,methodeit,polarizability, nquad,nlecture,filereread,
+c     output file cdm.out
+     $     nlocal,nmacro,nsection,nsectionsca,nquickdiffracte,nrig,
+     $     nforce,nforced,ntorque,ntorqued,nproche,nlentille,nquicklens
+     $     ,nobjet,
+c     cube, sphere (includes multiple)
+     $     side, sidex, sidey, sidez, hauteur,
+     $     numberobjet, rayonmulti, xgmulti, ygmulti, zgmulti,
+     $     epsmulti, epsanimulti,lc,hc,ng,
+c     ellipsoid+arbitrary
+     $     demiaxea,demiaxeb,demiaxec,thetaobj,phiobj,psiobj,
+     $     namefileobj,
+c     planewavecircular.in / planewavelinear.in files
+     $     theta, phi, pp, ss, P0, w0, xgaus, ygaus, zgaus,namefileinc,
+c     return info stringf
+     $     infostr, nstop,
+c     return scalar results
+     $     nbsphere, ndipole, aretecube,
+     $     lambda10n, k0, tol1, ncompte, nloop,
+     $     Cext, Cabs, Csca, Cscai, gasym, irra, E0,
+     $     forcet, forcem,
+     $     couplet, couplem,
+     $     nxm, nym, nzm
+      write(*,*) 'prout1'
+      do i=1,nxm*nym*nzm
+         write(*,*) 'i',i,incidentfield(i), localfield(i),
+     $        macroscopicfield(i),xs(i), ys(i), zs(i), xswf(i), yswf(i),
+     $        zswf(i),forcex(i),forcey(i),forcez(i), incidentfieldx(i),
+     $        incidentfieldy(i), incidentfieldz(i), localfieldx(i),
+     $        localfieldy(i), localfieldz(i), macroscopicfieldx(i),
+     $        macroscopicfieldy(i), macroscopicfieldz(i), torquex(i)
+     $        ,torquey(i),torquez(i)
+
+      enddo
+      write(*,*) 'prout2',ntheta, nphi, forcexmulti ,forceymulti
+     $     ,forcezmulti,torquexmulti,torqueymulti, to rquezmulti, nfft2d
+     $     ,numaper ,gross
+      if (nstop == -1) then
+         infostr = 'Calculation cancelled at the end!'
+         return
+      endif
+      write(*,*) 'COMPLETED!'
+      infostr='COMPLETED!'
+      write(*,*) 'END'
+      end
+
